@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environment
+venv/
+env/
+ENV/
+
+# VSCode or IDE settings
+.vscode/
+.idea/
+
+# macOS
+.DS_Store
+
+# Byte-compiled files
+*.egg-info/
+.eggs/
+
+# Logs
+*.log
