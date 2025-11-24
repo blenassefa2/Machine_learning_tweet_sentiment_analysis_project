@@ -1,5 +1,5 @@
 import { AppBar, Toolbar, Typography, Button, Box, useMediaQuery, useTheme } from '@mui/material';
-import { Image, Psychology } from '@mui/icons-material';
+
 import { keyframes } from '@emotion/react';
 
 

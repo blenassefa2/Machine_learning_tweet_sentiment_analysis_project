@@ -1,4 +1,4 @@
-import { Box, Typography, IconButton, useMediaQuery, useTheme } from '@mui/material';
+import { Box, Typography, IconButton } from '@mui/material';
 import { GitHub, Twitter, LinkedIn } from '@mui/icons-material';
 import { keyframes } from '@emotion/react';
 
@@ -16,8 +16,8 @@ const fadeInUp = keyframes`
 `;
 
 const Footer = () => {
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+
+  
 
   return (
     <Box
