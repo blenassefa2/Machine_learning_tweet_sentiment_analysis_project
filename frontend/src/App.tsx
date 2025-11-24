@@ -1,35 +1,79 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { Box, ThemeProvider, createTheme, CssBaseline } from '@mui/material';
+import Navbar from './components/Navbar';
+import Footer from './components/Footer';
+import BackgroundAnimation from './components/BackgroundAnimation';
+import Hero from './sections/Hero';
+import FileUpload from './sections/FileUpload';
+import ConfigurationReview from './sections/ConfigurationReview';
+import './App.css';
+
+const darkTheme = createTheme({
+  palette: {
+    mode: 'dark',
+    primary: {
+      main: '#646cff',
+    },
+    background: {
+      default: '#0d0d0f',
+      paper: '#0f0f11',
+    },
+  },
+  components: {
+    MuiCssBaseline: {
+      styleOverrides: {
+        body: {
+          backgroundColor: '#0d0d0f !important',
+          backgroundImage: 'none !important',
+        },
+        html: {
+          backgroundColor: '#0d0d0f !important',
+          backgroundImage: 'none !important',
+        },
+        '#root': {
+          backgroundColor: '#0d0d0f !important',
+          backgroundImage: 'none !important',
+        },
+      },
+    },
+  },
+});
 
 function App() {
-  const [count, setCount] = useState(0)
-
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    <ThemeProvider theme={darkTheme}>
+      <CssBaseline />
+      <Box
+        sx={{
+          minHeight: '100vh',
+          width: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          backgroundColor: '#0d0d0f',
+          backgroundImage: 'none',
+          position: 'relative',
+          overflow: 'hidden',
+        }}
+      >
+        <BackgroundAnimation />
+        <Box
+          sx={{
+            position: 'relative',
+            zIndex: 1,
+            width: '100%',
+            backgroundColor: 'transparent',
+          }}
+        >
+          <Navbar />
+          <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+            <Hero />
+            <FileUpload />
+            <ConfigurationReview />
+          </Box>
+          <Footer />
+        </Box>
+      </Box>
+    </ThemeProvider>
+  );
 }
 
-export default App
+export default App;
