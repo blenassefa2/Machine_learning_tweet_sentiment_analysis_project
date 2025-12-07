@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings
+from pydantic import ConfigDict
 from dotenv import load_dotenv
 import os
 from typing import List, Optional
@@ -20,8 +21,10 @@ class Settings(BaseSettings):
        
     # Supabase Configuration
     SUPABASE_URL: str
-    SUPABASE_KEY: str
-    SUPABASE_SERVICE_KEY: Optional[str] = None
+    SUPABASE_ANON_KEY: str
+    SUPABASE_SERVICE_KEY: str
+    SUPABASE_BUCKET: str
+    SECRET_KEY: str 
     
     # Redis Settings
     REDIS_URL: str = "redis://localhost:6379"
@@ -32,12 +35,12 @@ class Settings(BaseSettings):
     CORS_ORIGINS: List[str] = ["http://localhost:3000"]
     
     
-    class Config:
-        env_file = str(ROOT_DIR / ".env")
-        env_file_encoding = "utf-8"
-        case_sensitive = True
+    model_config =  ConfigDict(
+        env_file = str(ROOT_DIR / ".env"),
+        env_file_encoding = "utf-8",
+        case_sensitive = True,
         extra = "allow"  # Allow extra fields in .env file
-
+    )
 
 # Create settings instance
 settings = Settings() 
