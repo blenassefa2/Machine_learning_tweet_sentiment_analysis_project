@@ -22,3 +22,7 @@ ENV/
 
 # Logs
 *.log
+
+env
+*env*
+.env
