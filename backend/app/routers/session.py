@@ -1,65 +1,31 @@
 from fastapi import APIRouter, HTTPException
-from app.core.database import get_supabase
+from app.services.session_service import create_session, get_session
 
-router = APIRouter()
+router = APIRouter(prefix="/session", tags=["session"])
 
-SESSION_TABLE = "sessions"   # Must exist in Supabase
-
-@router.get("/session/cleanup/status")
-async def get_session_cleanup_status():
+@router.post("", response_model=dict)
+def start_session():
     """
-    Returns total active sessions and last cleanup timestamp (if stored).
+    Create a new session for a user.
     """
-    supabase = get_supabase()
-
-    # Count how many sessions currently exist
-    result = supabase.table(SESSION_TABLE).select("session_id").execute()
-
-    if hasattr(result, "error") and result.error:
-        raise HTTPException(status_code=500, detail="Failed to fetch session info")
-
+    session = create_session()
     return {
-        "active_sessions": len(result.data),
-        "status": "ok"
+        "session_id": session["session_id"],
+        "expires_at": session["expires_at"]
     }
 
 
-@router.post("/session/cleanup/force")
-async def force_session_cleanup():
+@router.get("/{session_id}", response_model=dict)
+def fetch_session(session_id: str):
     """
-    Deletes ALL user session data. When sessions are deleted,
-    all associated user data (datasets, models, results) must also be removed.
+    Fetch session info if valid.
     """
-    supabase = get_supabase()
+    session = get_session(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Session not found or expired")
+    return session
 
-    # Delete everything from sessions table
-    delete_sessions = supabase.table(SESSION_TABLE).delete().neq("session_id", "").execute()
-
-    if hasattr(delete_sessions, "error") and delete_sessions.error:
-        raise HTTPException(status_code=500, detail="Failed to delete sessions")
-
-    # Also clean linked data if your schema stores session_id in other tables.
-    # Example (uncomment when needed):
-    # supabase.table("datasets").delete().neq("session_id", "").execute()
-
-    return {
-        "message": "All sessions and associated data removed successfully",
-        "deleted_count": delete_sessions.count if hasattr(delete_sessions, "count") else None
-    }
-
-
-@router.get("/supabase-listener")
-async def get_supabase_listener_status():
-    """
-    Returns whether the backend can successfully connect to Supabase.
-    Useful for debugging connectivity.
-    """
-    supabase = get_supabase()
-
-    # Simple ping: read 1 row from sessions table
-    result = supabase.table(SESSION_TABLE).select("*").limit(1).execute()
-
-    if hasattr(result, "error") and result.error:
-        return {"status": "disconnected", "error": str(result.error)}
-
-    return {"status": "connected"}
+@router.delete("/{session_id}", response_model=dict)
+def delete_session(session_id: str):
+    session_service.delete_session(session_id)
+    return {"message": f"Session {session_id} deleted"}

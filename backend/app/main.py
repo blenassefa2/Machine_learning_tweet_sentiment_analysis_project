@@ -34,7 +34,7 @@ app.include_router(train.router, prefix="/api/train", tags=["Train"])
 app.include_router(predict.router, prefix="/api/predict", tags=["Predict"])
 app.include_router(evaluate.router, prefix="/api/evaluate", tags=["Evaluate"])
 # app.include_router(user.router, prefix="/api/user", tags=["user"])
-app.include_router(session.router, prefix="/api/session", tags=["session"])
+app.include_router(session.router, tags=["session"])
 
 @app.get("/")
 async def root():
