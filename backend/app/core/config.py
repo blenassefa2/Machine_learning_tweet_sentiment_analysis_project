@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     # Application Settings
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
-    CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:5173/", "https://pje.blen-tilahun.site/"]
+    CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:5173", "https://pje.blen-tilahun.site"]
     
     
     model_config =  ConfigDict(
