@@ -2,7 +2,7 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
-from app.api.routes import file, clean, classify, train, predict, evaluate, session
+from app.routers import datasets, session, clean
 
 
 port = int(os.environ.get("PORT", 8080))
@@ -27,14 +27,15 @@ app.add_middleware(
 
 
 # Include API routers
-app.include_router(file.router, prefix="/api/file", tags=["File"])
-app.include_router(clean.router, prefix="/api/clean", tags=["Clean"])
-app.include_router(classify.router, prefix="/api/classifiy", tags=["Classify"])
-app.include_router(train.router, prefix="/api/train", tags=["Train"])
-app.include_router(predict.router, prefix="/api/predict", tags=["Predict"])
-app.include_router(evaluate.router, prefix="/api/evaluate", tags=["Evaluate"])
+app.include_router(datasets.router)
+app.include_router(clean.router)
+# app.include_router(clean.router, prefix="/api/clean", tags=["Clean"])
+# app.include_router(classify.router, prefix="/api/classifiy", tags=["Classify"])
+# app.include_router(train.router, prefix="/api/train", tags=["Train"])
+# app.include_router(predict.router, prefix="/api/predict", tags=["Predict"])
+# app.include_router(evaluate.router, prefix="/api/evaluate", tags=["Evaluate"])
 # app.include_router(user.router, prefix="/api/user", tags=["user"])
-app.include_router(session.router, tags=["session"])
+app.include_router(session.router)
 
 @app.get("/")
 async def root():
