@@ -1,15 +1,36 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
+from app.services.predict_service import (
+    predict_one,
+    predict_many,
+    predict_dataset
+)
+from app.models.train import PredictModelRequest
 
-router = APIRouter()
+router = APIRouter(prefix="/predict", tags=["predict"])
 
-@router.post("/predict/one_tweet")
-async def predict_one_tweet(model: str, tweet: str):
-    return {"status": "ok"} 
 
-@router.post("/predict/multiple_tweets")
-async def predict_multiple_tweets(model: str, file_to_be_predicted: str):
-    return {"status": "ok"} 
+@router.post("/one")
+def predict_single(req: PredictModelRequest):
+    try:
+        pred = predict_one(req.model_id, req.session_id, req.input_text)
+        return {"prediction": pred}
+    except Exception as e:
+        raise HTTPException(400, str(e))
 
-@router.get("/predict/status")
-async def get_predict_status(file_name: str):
-    return {"status": "ok"} 
+
+@router.post("/many")
+def predict_list(req: PredictModelRequest):
+    try:
+        preds = predict_many(req.model_id, req.session_id, req.texts)
+        return {"predictions": preds}
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
+
+@router.post("/dataset")
+def predict_on_dataset(req: PredictModelRequest):
+    try:
+        preds = predict_dataset(req.model_id, req.session_id, req.dataset_id)
+        return {"predictions": preds}
+    except Exception as e:
+        raise HTTPException(400, str(e))
