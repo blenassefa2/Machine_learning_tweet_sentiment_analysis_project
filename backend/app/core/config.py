@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     SUPABASE_SERVICE_KEY: str
     SUPABASE_BUCKET: str
     SECRET_KEY: str 
+    MODEL_BUCKET: str = "models"
     
     # Redis Settings
     REDIS_URL: str = "redis://localhost:6379"
