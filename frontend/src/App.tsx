@@ -4,7 +4,7 @@ import Footer from './components/Footer';
 import BackgroundAnimation from './components/BackgroundAnimation';
 import Hero from './sections/Hero';
 import FileUpload from './sections/FileUpload';
-import ConfigurationReview from './sections/ConfigurationReview';
+import ConfigurationReview from './sections/ConfigurationReview.tsx';
 import './App.css';
 
 const darkTheme = createTheme({
@@ -67,7 +67,7 @@ function App() {
           <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
             <Hero />
             <FileUpload />
-            <ConfigurationReview />
+            <ConfigurationReview/>
           </Box>
           <Footer />
         </Box>
