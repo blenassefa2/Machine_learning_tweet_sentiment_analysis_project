@@ -11,6 +11,7 @@ import ProcessConfigurations from '../components/ProcessConfigurations';
 import AdvancedSettings from '../components/AdvancedSettings';
 import DataReview from '../components/DataReview';
 import ProgressModal from '../components/ProgressModal';
+import type { TextCleaningState, ColumnValidationState } from '../components/DataCleaningConfig';
 
 const fadeInUp = keyframes`
   from {
@@ -38,8 +39,21 @@ const ConfigurationReview = () => {
 
   // Data Cleaning State
   const [cleaningOption, setCleaningOption] = useState('');
-  const [normalizeMethod, setNormalizeMethod] = useState('');
-  const [missingValueStrategy, setMissingValueStrategy] = useState('mean');
+  const [missingValueStrategy, setMissingValueStrategy] = useState('fill_mean');
+  const [keepColumns, setKeepColumns] = useState('');
+  const [textCleaning, setTextCleaning] = useState<TextCleaningState>({
+    removeUrls: true,
+    removeRetweets: true,
+    removeHashtags: true,
+    removeMentions: true,
+    removeNumbers: false,
+    removeHtmlTags: true,
+    removeExtraSpaces: true,
+    removeContradictoryEmojis: true,
+    removeNotFrench: false,
+    removeNotEnglish: false,
+  });
+  const [columnValidations, setColumnValidations] = useState<ColumnValidationState[]>([]);
 
   // Classification State
   const [classifier, setClassifier] = useState('');
@@ -119,10 +133,14 @@ const ConfigurationReview = () => {
           <ProcessConfigurations
             cleaningOption={cleaningOption}
             setCleaningOption={setCleaningOption}
-            normalizeMethod={normalizeMethod}
-            setNormalizeMethod={setNormalizeMethod}
             missingValueStrategy={missingValueStrategy}
             setMissingValueStrategy={setMissingValueStrategy}
+            textCleaning={textCleaning}
+            setTextCleaning={setTextCleaning}
+            columnValidations={columnValidations}
+            setColumnValidations={setColumnValidations}
+            keepColumns={keepColumns}
+            setKeepColumns={setKeepColumns}
             classifier={classifier}
             setClassifier={setClassifier}
             classifierParams={classifierParams}
@@ -163,8 +181,10 @@ const ConfigurationReview = () => {
           onJobStart={handleJobStart}
           cleaningConfig={{
             cleaningOption,
-            normalizeMethod,
             missingValueStrategy,
+            textCleaning,
+            columnValidations,
+            keepColumns,
           }}
           classificationConfig={{
             classifier,

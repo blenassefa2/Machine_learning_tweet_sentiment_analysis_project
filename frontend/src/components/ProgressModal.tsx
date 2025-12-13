@@ -9,11 +9,19 @@ import {
   Box,
   LinearProgress,
   CircularProgress,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableRow,
+  Paper,
 } from '@mui/material';
 import { CheckCircle, Error as ErrorIcon } from '@mui/icons-material';
 import { getCleaningJob } from '../api/cleaning';
 import { getClassifyJob } from '../api/classify';
 import { getTrainingJob } from '../api/training';
+import { previewDataset } from '../api/datasets';
+import { useSession } from '../context/SessionContext';
 
 interface ProgressModalProps {
   open: boolean;
@@ -24,17 +32,27 @@ interface ProgressModalProps {
 }
 
 const ProgressModal = ({ open, jobId, jobType, onClose, onComplete }: ProgressModalProps) => {
+  const { sessionId } = useSession();
   const [status, setStatus] = useState<'pending' | 'running' | 'completed' | 'error'>('pending');
+  const [progress, setProgress] = useState<number>(0);
+  const [message, setMessage] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState<string>('');
+  const [previewData, setPreviewData] = useState<string[][]>([]);
+  const [loadingPreview, setLoadingPreview] = useState<boolean>(false);
+  const [datasetId, setDatasetId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open || !jobId || !jobType) {
       setStatus('pending');
+      setProgress(0);
+      setMessage('');
       setErrorMessage('');
+      setPreviewData([]);
+      setDatasetId(null);
       return;
     }
 
-    let interval: NodeJS.Timeout | null = null;
+    let interval: ReturnType<typeof setInterval> | null = null;
     const checkStatus = async () => {
       try {
         let response;
@@ -49,10 +67,39 @@ const ProgressModal = ({ open, jobId, jobType, onClose, onComplete }: ProgressMo
         }
 
         setStatus(response.status);
+        
+        // Store dataset_id for cleaning jobs
+        if (jobType === 'cleaning' && (response as any).dataset_id) {
+          setDatasetId((response as any).dataset_id);
+        }
+        
+        // Progress and message are available for cleaning jobs, optional for others
+        const cleaningResponse = response as any; // Type assertion for cleaning job response
+        if (cleaningResponse.progress !== undefined) {
+          setProgress(cleaningResponse.progress || 0);
+        } else {
+          setProgress(response.status === 'completed' ? 100 : response.status === 'running' ? 50 : 0);
+        }
+        
+        if (cleaningResponse.message !== undefined) {
+          setMessage(cleaningResponse.message || '');
+        }
+        
         if (response.logs) setErrorMessage(response.logs);
+        if (response.status === 'error' && cleaningResponse.message) {
+          setErrorMessage(cleaningResponse.message);
+        }
 
         if (response.status === 'completed') {
           if (interval) clearInterval(interval);
+          setProgress(100);
+          
+          // Load preview for cleaning jobs (use dataset_id from response if available)
+          const currentDatasetId = (response as any).dataset_id || datasetId;
+          if (jobType === 'cleaning' && currentDatasetId && sessionId && previewData.length === 0) {
+            loadCleanedPreview(currentDatasetId, sessionId);
+          }
+          
           if (onComplete) onComplete();
         } else if (response.status === 'error') {
           if (interval) clearInterval(interval);
@@ -73,6 +120,19 @@ const ProgressModal = ({ open, jobId, jobType, onClose, onComplete }: ProgressMo
       if (interval) clearInterval(interval);
     };
   }, [open, jobId, jobType, onComplete]);
+
+  const loadCleanedPreview = async (datasetId: string, sessionId: string) => {
+    setLoadingPreview(true);
+    try {
+      const preview = await previewDataset(datasetId, sessionId, true);
+      setPreviewData(preview || []);
+    } catch (err: any) {
+      console.error('Failed to load preview:', err);
+      setPreviewData([['Unable to load preview']]);
+    } finally {
+      setLoadingPreview(false);
+    }
+  };
 
   const getStatusText = () => {
     switch (status) {
@@ -115,23 +175,89 @@ const ProgressModal = ({ open, jobId, jobType, onClose, onComplete }: ProgressMo
             <>
               <CircularProgress sx={{ color: primaryColor }} />
               <Typography sx={{ color: '#ccc' }}>{getStatusText()}</Typography>
-              <LinearProgress
-                sx={{
-                  width: '100%',
-                  height: 8,
-                  borderRadius: 1,
-                  backgroundColor: '#1a1a1c',
-                  '& .MuiLinearProgress-bar': {
-                    backgroundColor: primaryColor,
-                  },
-                }}
-                variant={status === 'pending' ? 'indeterminate' : 'indeterminate'}
-              />
+              {message && (
+                <Typography sx={{ color: '#999', fontSize: '0.875rem', textAlign: 'center' }}>
+                  {message}
+                </Typography>
+              )}
+              <Box sx={{ width: '100%' }}>
+                <LinearProgress
+                  variant="determinate"
+                  value={progress}
+                  sx={{
+                    width: '100%',
+                    height: 8,
+                    borderRadius: 1,
+                    backgroundColor: '#1a1a1c',
+                    '& .MuiLinearProgress-bar': {
+                      backgroundColor: primaryColor,
+                    },
+                  }}
+                />
+                <Typography sx={{ color: '#999', fontSize: '0.75rem', textAlign: 'center', mt: 1 }}>
+                  {progress}%
+                </Typography>
+              </Box>
             </>
           ) : status === 'completed' ? (
             <>
               <CheckCircle sx={{ fontSize: 64, color: '#4caf50' }} />
               <Typography sx={{ color: '#fff', fontWeight: 500 }}>{getStatusText()}</Typography>
+              {message && (
+                <Typography sx={{ color: '#999', fontSize: '0.875rem', textAlign: 'center' }}>
+                  {message}
+                </Typography>
+              )}
+              {jobType === 'cleaning' && (
+                <Box sx={{ width: '100%', mt: 2 }}>
+                  <Typography sx={{ color: '#fff', mb: 1, fontSize: '0.875rem', fontWeight: 500 }}>
+                    Preview of Cleaned Data (Top 5 rows):
+                  </Typography>
+                  {loadingPreview ? (
+                    <CircularProgress size={24} sx={{ color: primaryColor }} />
+                  ) : previewData.length > 0 ? (
+                    <TableContainer 
+                      component={Paper} 
+                      sx={{ 
+                        maxHeight: 300, 
+                        backgroundColor: '#1a1a1c',
+                        border: '1px solid #2a2a2c',
+                      }}
+                    >
+                      <Table size="small">
+                        <TableBody>
+                          {previewData.map((row, rowIdx) => (
+                            <TableRow key={rowIdx}>
+                              {row.map((cell, cellIdx) => {
+                                const cellText = String(cell || '');
+                                const truncated = cellText.length > 50 
+                                  ? cellText.substring(0, 50) + '...' 
+                                  : cellText;
+                                return (
+                                  <TableCell
+                                    key={cellIdx}
+                                    sx={{
+                                      color: '#ccc',
+                                      borderBottom: '1px solid #2a2a2c',
+                                      whiteSpace: 'nowrap',
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis',
+                                      maxWidth: 200,
+                                    }}
+                                    title={cellText}
+                                  >
+                                    {truncated}
+                                  </TableCell>
+                                );
+                              })}
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  ) : null}
+                </Box>
+              )}
             </>
           ) : (
             <>

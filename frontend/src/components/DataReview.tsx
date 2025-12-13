@@ -22,7 +22,8 @@ import { listDatasets } from '../api/datasets';
 import { cleanDataset } from '../api/cleaning';
 import { labelNaive } from '../api/classify';
 import { trainModel } from '../api/training';
-import type { CleaningOptions } from '../api/cleaning';
+import type { CleaningOptions, MissingValueOption, ColumnValidationOptions } from '../api/cleaning';
+import type { TextCleaningState, ColumnValidationState } from './DataCleaningConfig';
 
 const fadeInUp = keyframes`
   from {
@@ -47,8 +48,10 @@ interface DataReviewProps {
   onJobStart: (jobId: string, jobType: 'cleaning' | 'classification' | 'training') => void;
   cleaningConfig?: {
     cleaningOption: string;
-    normalizeMethod: string;
     missingValueStrategy: string;
+    textCleaning?: TextCleaningState;
+    columnValidations?: ColumnValidationState[];
+    keepColumns?: string;
   };
   classificationConfig?: {
     classifier: string;
@@ -119,14 +122,113 @@ const DataReview = ({
     try {
       const options: CleaningOptions = {};
       
+      // Remove duplicates
       if (cleaningConfig.cleaningOption === 'duplicates') {
         options.remove_duplicates = true;
-      } else if (cleaningConfig.cleaningOption === 'missing') {
-        options.missing_values = {
-          strategy: cleaningConfig.missingValueStrategy as 'drop' | 'mean' | 'median' | 'mode',
+      }
+      
+      // Missing value handling
+      if (cleaningConfig.cleaningOption === 'missing' && cleaningConfig.missingValueStrategy) {
+        const strategyMap: Record<string, MissingValueOption['strategy']> = {
+          'fill_mean': 'fill_mean',
+          'fill_median': 'fill_median',
+          'fill_mode': 'fill_mode',
+          'fill_constant': 'fill_constant',
+          'drop': 'drop_rows',
         };
-      } else if (cleaningConfig.cleaningOption === 'normalize') {
-        options.normalize = cleaningConfig.normalizeMethod as 'minmax' | 'standard' | 'robust';
+        
+        const strategy = strategyMap[cleaningConfig.missingValueStrategy] || 'fill_mean';
+        options.missing_value_options = [{
+          strategy,
+        }];
+      }
+      
+      // Keep columns - parse "number:name" format, send as list of dicts with index and name
+      if (cleaningConfig.keepColumns && cleaningConfig.keepColumns.trim()) {
+        const columnPairs = cleaningConfig.keepColumns
+          .split(',')
+          .map(col => col.trim())
+          .filter(col => col.length > 0 && col.includes(':'))
+          .map(col => {
+            const parts = col.split(':').map(s => s.trim());
+            const colNum = parseInt(parts[0]);
+            const name = parts[1];
+            // Validate name is from allowed enum
+            const allowedNames = ['tweet', 'id', 'date', 'target', 'username', 'topic'];
+            if (!isNaN(colNum) && allowedNames.includes(name)) {
+              return { index: colNum, name: name };
+            }
+            return null;
+          })
+          .filter((item): item is { index: number; name: string } => item !== null);
+        
+        if (columnPairs.length > 0) {
+          options.keep_columns = columnPairs;
+        }
+      }
+      
+      // Text cleaning - automatically use "tweet" column if it's in keepColumns
+      const hasTextCleaningOptions = cleaningConfig.textCleaning && (
+        cleaningConfig.textCleaning.removeUrls ||
+        cleaningConfig.textCleaning.removeRetweets ||
+        cleaningConfig.textCleaning.removeHashtags ||
+        cleaningConfig.textCleaning.removeMentions ||
+        cleaningConfig.textCleaning.removeContradictoryEmojis
+      );
+      
+      if (hasTextCleaningOptions) {
+        // Find "tweet" column index from keepColumns
+        const keepCols = options.keep_columns as { index: number; name: string }[] | undefined;
+        let tweetColumnIndex: number | null = null;
+        if (keepCols && Array.isArray(keepCols)) {
+          const tweetCol = keepCols.find(col => col.name === 'tweet');
+          if (tweetCol) {
+            tweetColumnIndex = tweetCol.index;
+          }
+        }
+        
+        // Use tweet column index if found, otherwise default to 0 (first column)
+        const textColumnIndex = tweetColumnIndex !== null ? tweetColumnIndex : 0;
+        
+        options.text_cleaning = {
+          text_columns: [textColumnIndex.toString()], // Send as string, will be converted to int
+          remove_urls: cleaningConfig.textCleaning?.removeUrls ?? true,
+          remove_retweets: cleaningConfig.textCleaning?.removeRetweets ?? true,
+          remove_hashtags: cleaningConfig.textCleaning?.removeHashtags ?? true,
+          remove_mentions: cleaningConfig.textCleaning?.removeMentions ?? true,
+          remove_numbers: cleaningConfig.textCleaning?.removeNumbers ?? false,
+          remove_html_tags: cleaningConfig.textCleaning?.removeHtmlTags ?? true,
+          remove_extra_spaces: cleaningConfig.textCleaning?.removeExtraSpaces ?? true,
+          remove_contradictory_emojis: cleaningConfig.textCleaning?.removeContradictoryEmojis ?? true,
+          remove_not_french: cleaningConfig.textCleaning?.removeNotFrench ?? false,
+          remove_not_english: cleaningConfig.textCleaning?.removeNotEnglish ?? false,
+        };
+      }
+      
+      // Column validations
+      if (cleaningConfig.columnValidations && cleaningConfig.columnValidations.length > 0) {
+        options.column_validations = cleaningConfig.columnValidations
+          .filter(v => v.column && v.validationType)
+          .map(v => {
+            const validation: ColumnValidationOptions = {
+              column: v.column,
+              validation_type: v.validationType as ColumnValidationOptions['validation_type'],
+            };
+            
+            if (v.validationType === 'polarity' && v.allowedValues) {
+              validation.allowed_values = v.allowedValues
+                .split(',')
+                .map(val => parseInt(val.trim()))
+                .filter(val => !isNaN(val));
+            }
+            
+            if (v.validationType === 'max_length' && v.maxLength) {
+              validation.max_length = parseInt(v.maxLength);
+            }
+            
+            return validation;
+          })
+          .filter(v => v.column && v.validation_type);
       }
 
       const result = await cleanDataset(datasetId, sessionId, options);
@@ -323,7 +425,17 @@ const DataReview = ({
                       variant="outlined"
                       size="small"
                       onClick={() => handleClean(dataset.dataset_id)}
-                      disabled={!cleaningConfig?.cleaningOption}
+                      disabled={
+                        !cleaningConfig?.cleaningOption &&
+                        (!cleaningConfig?.textCleaning || 
+                         (!cleaningConfig.textCleaning.removeUrls &&
+                          !cleaningConfig.textCleaning.removeRetweets &&
+                          !cleaningConfig.textCleaning.removeHashtags &&
+                          !cleaningConfig.textCleaning.removeMentions &&
+                          !cleaningConfig.textCleaning.removeContradictoryEmojis)) &&
+                        (!cleaningConfig?.columnValidations || cleaningConfig.columnValidations.length === 0) &&
+                        !cleaningConfig?.keepColumns
+                      }
                       sx={{
                         borderColor: primaryColor,
                         color: primaryColor,

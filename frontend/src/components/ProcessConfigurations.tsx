@@ -2,15 +2,20 @@ import { Box } from '@mui/material';
 import DataCleaningConfig from './DataCleaningConfig';
 import ClassificationConfig from './ClassificationConfig';
 import TrainingConfig from './TrainingConfig';
+import type { TextCleaningState, ColumnValidationState } from './DataCleaningConfig';
 
 interface ProcessConfigurationsProps {
   // Data Cleaning
   cleaningOption: string;
   setCleaningOption: (value: string) => void;
-  normalizeMethod: string;
-  setNormalizeMethod: (value: string) => void;
   missingValueStrategy: string;
   setMissingValueStrategy: (value: string) => void;
+  textCleaning: TextCleaningState;
+  setTextCleaning: (value: TextCleaningState) => void;
+  columnValidations: ColumnValidationState[];
+  setColumnValidations: (value: ColumnValidationState[]) => void;
+  keepColumns: string;
+  setKeepColumns: (value: string) => void;
   
   // Classification
   classifier: string;
@@ -54,10 +59,14 @@ const ProcessConfigurations = (props: ProcessConfigurationsProps) => {
       <DataCleaningConfig
         cleaningOption={props.cleaningOption}
         setCleaningOption={props.setCleaningOption}
-        normalizeMethod={props.normalizeMethod}
-        setNormalizeMethod={props.setNormalizeMethod}
         missingValueStrategy={props.missingValueStrategy}
         setMissingValueStrategy={props.setMissingValueStrategy}
+        textCleaning={props.textCleaning}
+        setTextCleaning={props.setTextCleaning}
+        columnValidations={props.columnValidations}
+        setColumnValidations={props.setColumnValidations}
+        keepColumns={props.keepColumns}
+        setKeepColumns={props.setKeepColumns}
       />
       <ClassificationConfig
         classifier={props.classifier}

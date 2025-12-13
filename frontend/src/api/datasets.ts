@@ -32,9 +32,9 @@ export const getDatasetStatus = async (datasetId: string, sessionId: string) => 
   return res.data.status;
 };
 
-export const previewDataset = async (datasetId: string, sessionId: string) => {
+export const previewDataset = async (datasetId: string, sessionId: string, useCleaned: boolean = false) => {
   const res = await axios.get(`${API_BASE}/${datasetId}/preview`, {
-    params: { session_id: sessionId },
+    params: { session_id: sessionId, use_cleaned: useCleaned },
   });
   return res.data.preview;
 };
