@@ -126,29 +126,55 @@ def _clean_text(
     
     return text
 
-def _apply_text_cleaning(df: pd.DataFrame, options: TextCleaningOptions) -> pd.DataFrame:
-    """Apply text cleaning to specified columns."""
+def _apply_text_cleaning(df: pd.DataFrame, options: TextCleaningOptions, column_mapping: dict = None) -> pd.DataFrame:
+    """Apply text cleaning to specified columns.
+    
+    Args:
+        df: DataFrame (columns are numeric indices)
+        options: Text cleaning options
+        column_mapping: Optional dict mapping column indices to names (e.g., {0: 'tweet'})
+    """
     if not options or not options.text_columns:
         return df
     
-    # Determine which columns to clean
-    columns_to_clean = options.text_columns
-    # Filter to only existing columns
-    columns_to_clean = [col for col in columns_to_clean if col in df.columns]
+    # Determine which columns to clean by index
+    columns_to_clean_indices = []
     
-    if not columns_to_clean:
+    # text_columns can be column names (strings) or indices (strings that are digits)
+    for col_spec in options.text_columns:
+        # Try to parse as integer index first
+        try:
+            col_idx = int(col_spec)
+            if 0 <= col_idx < len(df.columns):
+                columns_to_clean_indices.append(col_idx)
+                continue
+        except ValueError:
+            pass
+        
+        # If not an integer, try to find in column_mapping (reverse lookup)
+        if column_mapping:
+            for idx, name in column_mapping.items():
+                if name == col_spec:
+                    columns_to_clean_indices.append(idx)
+                    break
+    
+    if not columns_to_clean_indices:
         return df
     
-    # Apply cleaning to each column
-    for col in columns_to_clean:
-        df[col] = df[col].apply(lambda x: _clean_text(x, options))
+    # Apply cleaning to each column by index
+    for col_idx in columns_to_clean_indices:
+        if col_idx < len(df.columns):
+            df.iloc[:, col_idx] = df.iloc[:, col_idx].apply(lambda x: _clean_text(x, options))
     
     # Remove rows where all text columns became empty
-    mask = df[columns_to_clean].apply(lambda row: any(str(val).strip() != "" for val in row), axis=1)
-    rows_removed = len(df) - mask.sum()
-    if rows_removed > 0:
-        cleaning_metrics["rows_removed_empty_text"] += rows_removed
-        df = df[mask]
+    if columns_to_clean_indices:
+        mask = df.iloc[:, columns_to_clean_indices].apply(
+            lambda row: any(str(val).strip() != "" for val in row), axis=1
+        )
+        rows_removed = len(df) - mask.sum()
+        if rows_removed > 0:
+            cleaning_metrics["rows_removed_empty_text"] += rows_removed
+            df = df[mask]
     
     return df
 
@@ -156,8 +182,14 @@ def _apply_text_cleaning(df: pd.DataFrame, options: TextCleaningOptions) -> pd.D
 # Column Validation Functions
 # -------------------------
 
-def _apply_column_validations(df: pd.DataFrame, validations: list[ColumnValidationOptions]) -> pd.DataFrame:
-    """Apply column validations and filter rows."""
+def _apply_column_validations(df: pd.DataFrame, validations: list[ColumnValidationOptions], column_mapping: dict = None) -> pd.DataFrame:
+    """Apply column validations and filter rows.
+    
+    Args:
+        df: DataFrame with numeric column indices
+        validations: List of validation rules
+        column_mapping: Optional dict mapping column indices to names (e.g., {0: 'tweet'})
+    """
     if not validations:
         return df
     
@@ -165,29 +197,50 @@ def _apply_column_validations(df: pd.DataFrame, validations: list[ColumnValidati
     mask = pd.Series([True] * len(df), index=df.index)
     
     for validation in validations:
-        col = validation.column
-        if col not in df.columns:
+        # Try to find column index from column name or use as index directly
+        col_idx = None
+        col_name = validation.column
+        
+        # Try to parse as integer index
+        try:
+            col_idx = int(col_name)
+            if col_idx >= len(df.columns):
+                continue
+        except ValueError:
+            # Not an integer, try to find in column_mapping (reverse lookup)
+            if column_mapping:
+                for idx, name in column_mapping.items():
+                    if name == col_name:
+                        col_idx = idx
+                        break
+            if col_idx is None:
+                continue
+        
+        if col_idx is None or col_idx >= len(df.columns):
             continue
+        
+        # Access column by index
+        col_series = df.iloc[:, col_idx]
         
         if validation.validation_type == "polarity":
             if validation.allowed_values:
                 allowed = set(validation.allowed_values)
                 try:
-                    col_mask = df[col].astype(str).apply(lambda x: int(x) if x.isdigit() else None).isin(allowed) | df[col].isna()
+                    col_mask = col_series.astype(str).apply(lambda x: int(x) if x.isdigit() else None).isin(allowed) | col_series.isna()
                     invalid_mask = ~col_mask
                     if invalid_mask.any():
-                        cleaning_metrics[f"invalid_polarity_{col}"] += invalid_mask.sum()
+                        cleaning_metrics[f"invalid_polarity_{col_idx}"] += invalid_mask.sum()
                     mask = mask & col_mask
                 except Exception:
-                    cleaning_metrics[f"wrong_polarity_format_{col}"] += len(df)
+                    cleaning_metrics[f"wrong_polarity_format_{col_idx}"] += len(df)
                     mask = pd.Series([False] * len(df), index=df.index)
         
         elif validation.validation_type == "unique_id":
             seen = set()
-            col_mask = df[col].apply(lambda x: x not in seen and (seen.add(x) or True) if pd.notna(x) and x != "" else False)
-            duplicates = ~col_mask & df[col].notna() & (df[col] != "")
+            col_mask = col_series.apply(lambda x: x not in seen and (seen.add(x) or True) if pd.notna(x) and x != "" else False)
+            duplicates = ~col_mask & col_series.notna() & (col_series != "")
             if duplicates.any():
-                cleaning_metrics[f"repeated_ids_{col}"] += duplicates.sum()
+                cleaning_metrics[f"repeated_ids_{col_idx}"] += duplicates.sum()
             mask = mask & col_mask
         
         elif validation.validation_type == "date":
@@ -210,25 +263,25 @@ def _apply_column_validations(df: pd.DataFrame, validations: list[ColumnValidati
                     pass
                 return None
             
-            col_mask = df[col].apply(parse_date).notna()
-            invalid = ~col_mask & df[col].notna()
+            col_mask = col_series.apply(parse_date).notna()
+            invalid = ~col_mask & col_series.notna()
             if invalid.any():
-                cleaning_metrics[f"wrong_date_format_{col}"] += invalid.sum()
+                cleaning_metrics[f"wrong_date_format_{col_idx}"] += invalid.sum()
             mask = mask & col_mask
         
         elif validation.validation_type == "not_empty":
-            col_mask = df[col].notna() & (df[col].astype(str).str.strip() != "")
+            col_mask = col_series.notna() & (col_series.astype(str).str.strip() != "")
             invalid = ~col_mask
             if invalid.any():
-                cleaning_metrics[f"empty_{col}"] += invalid.sum()
+                cleaning_metrics[f"empty_{col_idx}"] += invalid.sum()
             mask = mask & col_mask
         
         elif validation.validation_type == "max_length":
             if validation.max_length:
-                col_mask = df[col].astype(str).str.len() <= validation.max_length
-                invalid = ~col_mask & df[col].notna()
+                col_mask = col_series.astype(str).str.len() <= validation.max_length
+                invalid = ~col_mask & col_series.notna()
                 if invalid.any():
-                    cleaning_metrics[f"too_long_{col}"] += invalid.sum()
+                    cleaning_metrics[f"too_long_{col_idx}"] += invalid.sum()
                 mask = mask & col_mask
     
     rows_removed = initial_count - mask.sum()
@@ -241,15 +294,33 @@ def _apply_column_validations(df: pd.DataFrame, validations: list[ColumnValidati
 # Other Cleaning Helpers
 # -------------------------
 
-def _apply_keep_columns(df: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
-    """Keep only specified columns."""
-    if not columns:
+def _apply_keep_columns(df: pd.DataFrame, column_mapping: dict) -> pd.DataFrame:
+    """Keep only specified columns by index and rename them.
+    
+    Args:
+        df: DataFrame with numeric column indices
+        column_mapping: Dict mapping column numbers (as int) to column names (e.g., {0: 'tweet', 1: 'id'})
+    
+    Returns:
+        DataFrame with only specified columns, renamed with user-provided names
+    """
+    if not column_mapping:
         return df
-    # Filter to only existing columns
-    existing_cols = [col for col in columns if col in df.columns]
-    if not existing_cols:
+    
+    # Get column indices to keep (sorted to maintain order)
+    indices_to_keep = sorted([idx for idx in column_mapping.keys() if 0 <= idx < len(df.columns)])
+    
+    if not indices_to_keep:
         return df
-    return df[existing_cols]
+    
+    # Select columns by index
+    df_selected = df.iloc[:, indices_to_keep].copy()
+    
+    # Rename columns with user-provided names
+    new_column_names = [column_mapping[idx] for idx in indices_to_keep]
+    df_selected.columns = new_column_names
+    
+    return df_selected
 
 def _apply_remove_duplicates(df: pd.DataFrame) -> pd.DataFrame:
     """Remove duplicate rows."""
@@ -260,42 +331,71 @@ def _apply_remove_duplicates(df: pd.DataFrame) -> pd.DataFrame:
         cleaning_metrics["duplicate_rows"] += duplicates_removed
     return df
 
-def _apply_missing_value_options(df: pd.DataFrame, options: list[MissingValueOption]):
-    """Apply missing value handling options."""
+def _apply_missing_value_options(df: pd.DataFrame, options: list[MissingValueOption], column_mapping: dict = None):
+    """Apply missing value handling options.
+    
+    Args:
+        df: DataFrame with numeric column indices
+        options: List of missing value handling options
+        column_mapping: Optional dict mapping column indices to names (e.g., {0: 'tweet'})
+    """
     if not options:
         return df
 
     for opt in options:
-        cols = opt.columns if opt.columns else df.columns.tolist()
-        # Filter to only existing columns
-        cols = [col for col in cols if col in df.columns]
-        if not cols:
+        # Determine which columns to process
+        if opt.columns:
+            # Try to map column names to indices, or parse as indices
+            col_indices = []
+            for col_spec in opt.columns:
+                try:
+                    col_idx = int(col_spec)
+                    if 0 <= col_idx < len(df.columns):
+                        col_indices.append(col_idx)
+                except ValueError:
+                    # Not an integer, try to find in column_mapping
+                    if column_mapping:
+                        for idx, name in column_mapping.items():
+                            if name == col_spec:
+                                col_indices.append(idx)
+                                break
+        else:
+            # Apply to all columns
+            col_indices = list(range(len(df.columns)))
+        
+        if not col_indices:
             continue
             
         if opt.strategy == "drop_rows":
             initial_count = len(df)
-            df = df.dropna(subset=cols)
+            # Drop rows where any of the specified columns have NaN
+            mask = df.iloc[:, col_indices].notna().all(axis=1)
+            df = df[mask]
             rows_dropped = initial_count - len(df)
             if rows_dropped > 0:
                 cleaning_metrics["rows_dropped_missing"] += rows_dropped
         elif opt.strategy == "fill_constant":
             val = opt.constant_value if opt.constant_value is not None else ""
-            df[cols] = df[cols].fillna(val)
+            for col_idx in col_indices:
+                df.iloc[:, col_idx] = df.iloc[:, col_idx].fillna(val)
         elif opt.strategy == "fill_mean":
-            for c in cols:
-                if pd.api.types.is_numeric_dtype(df[c]):
-                    df[c] = df[c].fillna(df[c].mean())
+            for col_idx in col_indices:
+                col_series = df.iloc[:, col_idx]
+                if pd.api.types.is_numeric_dtype(col_series):
+                    df.iloc[:, col_idx] = col_series.fillna(col_series.mean())
         elif opt.strategy == "fill_median":
-            for c in cols:
-                if pd.api.types.is_numeric_dtype(df[c]):
-                    df[c] = df[c].fillna(df[c].median())
+            for col_idx in col_indices:
+                col_series = df.iloc[:, col_idx]
+                if pd.api.types.is_numeric_dtype(col_series):
+                    df.iloc[:, col_idx] = col_series.fillna(col_series.median())
         elif opt.strategy == "fill_mode":
-            for c in cols:
+            for col_idx in col_indices:
+                col_series = df.iloc[:, col_idx]
                 try:
-                    mode_val = df[c].mode().iloc[0]
-                    df[c] = df[c].fillna(mode_val)
+                    mode_val = col_series.mode().iloc[0]
+                    df.iloc[:, col_idx] = col_series.fillna(mode_val)
                 except Exception:
-                    df[c] = df[c].fillna("")
+                    df.iloc[:, col_idx] = col_series.fillna("")
     return df
 
 # -------------------------
@@ -378,14 +478,14 @@ def run_cleaning_job(job_id: str, dataset_id: str, session_id: str, options: Cle
             raise RuntimeError(f"Storage download error: {file_bytes}")
 
         update_job_progress(job_id, 15, "Parsing CSV")
-        # Read into pandas
+        # Read into pandas (CSV files don't have headers, first row is data)
         text = file_bytes.decode("utf-8")
-        # Try to infer separator; default comma
+        # Try to infer separator; default comma, no header row
         try:
-            df = pd.read_csv(io.StringIO(text))
+            df = pd.read_csv(io.StringIO(text), header=None)
         except Exception:
             # Fallback: try with sep='|'
-            df = pd.read_csv(io.StringIO(text), sep='|')
+            df = pd.read_csv(io.StringIO(text), sep='|', header=None)
 
         initial_row_count = len(df)
         cleaning_metrics["initial_rows"] = initial_row_count
@@ -397,7 +497,12 @@ def run_cleaning_job(job_id: str, dataset_id: str, session_id: str, options: Cle
         # Step 1: Column validations (filter rows early)
         if options.column_validations:
             update_job_progress(job_id, int(progress_base), "Validating columns")
-            df = _apply_column_validations(df, options.column_validations)
+            # Build column mapping first if keep_columns is provided
+            temp_column_mapping = {}
+            if options.keep_columns and isinstance(options.keep_columns, list) and len(options.keep_columns) > 0:
+                if isinstance(options.keep_columns[0], dict):
+                    temp_column_mapping = {int(item["index"]): item["name"] for item in options.keep_columns if "index" in item and "name" in item}
+            df = _apply_column_validations(df, options.column_validations, temp_column_mapping)
             progress_base += progress_step
 
         # Step 2: Remove duplicates
@@ -406,22 +511,36 @@ def run_cleaning_job(job_id: str, dataset_id: str, session_id: str, options: Cle
             df = _apply_remove_duplicates(df)
             progress_base += progress_step
 
+        # Build column mapping from keep_columns if provided
+        # Format: keep_columns should be a list of dicts like [{"index": 0, "name": "tweet"}, ...]
+        # OR we'll parse from the old format if it's a list of strings
+        column_mapping = {}
+        if options.keep_columns:
+            if isinstance(options.keep_columns, list) and len(options.keep_columns) > 0:
+                if isinstance(options.keep_columns[0], dict):
+                    # New format: list of dicts with index and name
+                    column_mapping = {int(item["index"]): item["name"] for item in options.keep_columns if "index" in item and "name" in item}
+                else:
+                    # Old format: list of strings (for backward compatibility, but won't work without headers)
+                    # Try to map by name if headers exist, otherwise skip
+                    pass
+
         # Step 3: Text cleaning
         if options.text_cleaning:
             update_job_progress(job_id, int(progress_base), "Cleaning text columns")
-            df = _apply_text_cleaning(df, options.text_cleaning)
+            df = _apply_text_cleaning(df, options.text_cleaning, column_mapping)
             progress_base += progress_step
 
-        # Step 4: Missing values
+        # Step 4: Missing values (by column index if needed)
         if options.missing_value_options:
             update_job_progress(job_id, int(progress_base), "Handling missing values")
-            df = _apply_missing_value_options(df, options.missing_value_options)
+            df = _apply_missing_value_options(df, options.missing_value_options, column_mapping)
             progress_base += progress_step
 
-        # Step 5: Keep columns (do this last to preserve columns needed for earlier steps)
-        if options.keep_columns:
-            update_job_progress(job_id, int(progress_base), "Selecting columns")
-            df = _apply_keep_columns(df, options.keep_columns)
+        # Step 5: Keep columns and add headers (do this last to preserve columns needed for earlier steps)
+        if column_mapping:
+            update_job_progress(job_id, int(progress_base), "Selecting columns and adding headers")
+            df = _apply_keep_columns(df, column_mapping)
             progress_base += progress_step
 
         final_row_count = len(df)

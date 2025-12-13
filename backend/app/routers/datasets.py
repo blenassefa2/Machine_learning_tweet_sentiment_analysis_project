@@ -47,8 +47,8 @@ def get_file_status(dataset_id: str, session_id: str):
 
 # --------------------------- Preview --------------------------
 @router.get("/{dataset_id}/preview")
-def preview_dataset(dataset_id: str, session_id: str):
-    rows = dataset_service.preview_dataset(dataset_id, session_id)
+def preview_dataset(dataset_id: str, session_id: str, use_cleaned: bool = False):
+    rows = dataset_service.preview_dataset(dataset_id, session_id, use_cleaned=use_cleaned)
     if rows is None:
         raise HTTPException(status_code=404, detail="Dataset not found")
     return {"preview": rows}

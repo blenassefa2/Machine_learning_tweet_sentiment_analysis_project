@@ -43,7 +43,8 @@ class ColumnValidationOptions(BaseModel):
 
 class CleaningOptions(BaseModel):
     # If provided, only these columns will be kept (others dropped)
-    keep_columns: Optional[List[str]] = None
+    # Can be a list of dicts with {"index": int, "name": str} or list of strings (for backward compatibility)
+    keep_columns: Optional[List[Any]] = None
 
     # Remove exact duplicate rows (True/False)
     remove_duplicates: bool = False

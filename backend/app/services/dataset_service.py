@@ -101,12 +101,17 @@ def download_dataset(dataset_id: str, session_id: str) -> bytes | None:
 # ---------------------------------------------------------
 # Preview File (top 5 rows)
 # ---------------------------------------------------------
-def preview_dataset(dataset_id: str, session_id: str) -> list[list[str]] | None:
+def preview_dataset(dataset_id: str, session_id: str, use_cleaned: bool = False) -> list[list[str]] | None:
     dataset = get_dataset(dataset_id, session_id)
     if not dataset:
         return None
 
-    filename = dataset["original_file"]
+    # Use cleaned_file if requested and available, otherwise use original_file
+    if use_cleaned and dataset.get("cleaned_file"):
+        filename = dataset["cleaned_file"]
+    else:
+        filename = dataset["original_file"]
+    
     file_bytes = supabase.storage.from_(DATA_BUCKET).download(filename)
 
     try:
