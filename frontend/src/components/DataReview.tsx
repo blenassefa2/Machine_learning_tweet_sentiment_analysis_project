@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -9,10 +9,13 @@ import {
   ListItemText,
   Divider,
   Button,
+  IconButton,
+  Tooltip,
+  CircularProgress,
   useMediaQuery,
   useTheme,
 } from '@mui/material';
-import { Description } from '@mui/icons-material';
+import { Description, Refresh } from '@mui/icons-material';
 import { keyframes } from '@emotion/react';
 import { useSession } from '../context/SessionContext';
 import { listDatasets } from '../api/datasets';
@@ -71,34 +74,44 @@ const DataReview = ({
   const { sessionId } = useSession();
   const [datasets, setDatasets] = useState<Dataset[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const primaryColor = '#646cff';
   const primaryColorDark = '#5058e6';
 
-  useEffect(() => {
+  const loadDatasets = useCallback(async (showRefreshState = false) => {
     if (!sessionId) {
       setIsLoading(false);
       return;
     }
 
-    const loadDatasets = async () => {
-      try {
+    try {
+      if (showRefreshState) {
+        setIsRefreshing(true);
+      } else {
         setIsLoading(true);
-        const data = await listDatasets(sessionId);
-        // Handle different possible response structures
-        const datasetsList = Array.isArray(data) ? data : (data.recentUploads || data.datasets || []);
-        setDatasets(datasetsList);
-      } catch (error) {
-        console.error('Error fetching datasets:', error);
-        setDatasets([]);
-      } finally {
-        setIsLoading(false);
       }
-    };
-
-    loadDatasets();
+      const data = await listDatasets(sessionId);
+      // Handle different possible response structures
+      const datasetsList = Array.isArray(data) ? data : (data.recentUploads || data.datasets || []);
+      setDatasets(datasetsList);
+    } catch (error) {
+      console.error('Error fetching datasets:', error);
+      setDatasets([]);
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
   }, [sessionId]);
+
+  useEffect(() => {
+    loadDatasets();
+  }, [loadDatasets]);
+
+  const handleRefresh = () => {
+    loadDatasets(true);
+  };
 
   const handleClean = async (datasetId: string) => {
     if (!cleaningConfig || !sessionId) return;
@@ -216,18 +229,48 @@ const DataReview = ({
         animation: `${fadeInUp} 0.8s ease-out 0.8s both`,
       }}
     >
-      <Typography
-        variant={isMobile ? 'h5' : 'h4'}
-        component="h2"
+      <Box
         sx={{
-          fontWeight: 600,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 2,
           mb: 4,
-          color: '#fff',
-          textAlign: 'center',
         }}
       >
-        Recent Uploads
-      </Typography>
+        <Typography
+          variant={isMobile ? 'h5' : 'h4'}
+          component="h2"
+          sx={{
+            fontWeight: 600,
+            color: '#fff',
+            textAlign: 'center',
+          }}
+        >
+          Recent Uploads
+        </Typography>
+        <Tooltip title="Refresh datasets">
+          <IconButton
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            sx={{
+              color: primaryColor,
+              '&:hover': {
+                backgroundColor: 'rgba(100, 108, 255, 0.1)',
+              },
+              '&:disabled': {
+                color: '#666',
+              },
+            }}
+          >
+            {isRefreshing ? (
+              <CircularProgress size={24} sx={{ color: primaryColor }} />
+            ) : (
+              <Refresh />
+            )}
+          </IconButton>
+        </Tooltip>
+      </Box>
 
       <Paper
         sx={{

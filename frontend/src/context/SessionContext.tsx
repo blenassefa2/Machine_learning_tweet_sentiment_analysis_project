@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useRef, type ReactNode } from "react";
 import { start } from "../api/sessions";
 
 interface SessionContextType {
@@ -10,22 +10,26 @@ const SessionContext = createContext<SessionContextType | undefined>(undefined);
 
 export const SessionProvider = ({ children }: { children: ReactNode }) => {
   const [sessionId, setSessionId] = useState<string>("");
+  const isInitializing = useRef(false);
 
   useEffect(() => {
     const initSession = async () => {
+      // Prevent double initialization in StrictMode
+      if (isInitializing.current || sessionId) return;
+      isInitializing.current = true;
+
       try {
-        const data = await start(); // calls your backend /session
+        const data = await start();
         setSessionId(data.session_id);
         console.log("Session initialized:", data.session_id);
-      } catch (err) {
+      } catch (err) { 
         console.error("Failed to start session:", err);
+        isInitializing.current = false; // Reset on error to allow retry
       }
     };
 
-    if (!sessionId) {
-      initSession();
-    }
-  }, [sessionId]);
+    initSession();
+  }, []); // Empty dependency array - only run once on mount
 
   return (
     <SessionContext.Provider value={{ sessionId, setSessionId }}>
