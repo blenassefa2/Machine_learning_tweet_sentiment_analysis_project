@@ -76,8 +76,6 @@ const DataCleaningConfig = ({
   setMissingValueStrategy,
   textCleaning,
   setTextCleaning,
-  columnValidations,
-  setColumnValidations,
   keepColumns,
   setKeepColumns,
 }: DataCleaningConfigProps) => {
