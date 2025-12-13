@@ -17,6 +17,12 @@ try:
 except ImportError:
     LANGDETECT_AVAILABLE = False
 
+try:
+    import chardet
+    CHARDET_AVAILABLE = True
+except ImportError:
+    CHARDET_AVAILABLE = False
+
 DATA_BUCKET = "datasets"
 JOB_TABLE = "clean_jobs"
 DATASET_TABLE = "datasets"
@@ -478,15 +484,59 @@ def run_cleaning_job(job_id: str, dataset_id: str, session_id: str, options: Cle
         if isinstance(file_bytes, dict) and file_bytes.get("error"):
             raise RuntimeError(f"Storage download error: {file_bytes}")
 
-        update_job_progress(job_id, 15, "Parsing CSV")
-        # Read into pandas (CSV files don't have headers, first row is data)
-        text = file_bytes.decode("utf-8")
-        # Try to infer separator; default comma, no header row
-        try:
-            df = pd.read_csv(io.StringIO(text), header=None)
+        update_job_progress(job_id, 15, "Detecting encoding and parsing CSV")
+        
+        # Detect encoding gracefully (similar to input_output.py)
+        encoding = "utf-8"  # Default encoding
+        if CHARDET_AVAILABLE:
+            try:
+                # Sample first 50KB for encoding detection (faster than full file)
+                sample_size = min(50000, len(file_bytes))
+                result = chardet.detect(file_bytes[:sample_size])
+                if result and result.get("encoding"):
+                    detected_encoding = result["encoding"]
+                    # Use detected encoding if confidence is reasonable
+                    if result.get("confidence", 0) > 0.7:
+                        encoding = detected_encoding
         except Exception:
-            # Fallback: try with sep='|'
-            df = pd.read_csv(io.StringIO(text), sep='|', header=None)
+                # If detection fails, fall back to default
+                pass
+        
+        # Decode with graceful fallback
+        text = None
+        encodings_to_try = [encoding, "utf-8", "latin-1", "iso-8859-1", "cp1252", "windows-1252"]
+        
+        for enc in encodings_to_try:
+            try:
+                text = file_bytes.decode(enc, errors="replace")
+                break
+            except (UnicodeDecodeError, LookupError):
+                continue
+        
+        if text is None:
+            # Last resort: decode with errors='replace' using utf-8
+            text = file_bytes.decode("utf-8", errors="replace")
+        
+        # Read into pandas (CSV files don't have headers, first row is data)
+        # Try to infer separator; default comma, no header row
+        df = None
+        separators_to_try = [',', '|', ';', '\t']
+        
+        for sep in separators_to_try:
+            try:
+                df = pd.read_csv(io.StringIO(text), header=None, sep=sep, on_bad_lines='skip', engine='python')
+                # If we got a valid DataFrame with reasonable number of columns, use it
+                if df is not None and len(df.columns) > 0:
+                    break
+            except Exception:
+                continue
+        
+        if df is None:
+            # Final fallback: try with default settings
+            try:
+                df = pd.read_csv(io.StringIO(text), header=None, on_bad_lines='skip', engine='python')
+            except Exception as e:
+                raise RuntimeError(f"Failed to parse CSV file: {e}")
 
         initial_row_count = len(df)
         cleaning_metrics["initial_rows"] = initial_row_count
