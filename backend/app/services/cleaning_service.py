@@ -3,6 +3,7 @@ import uuid
 import io
 import re
 import pandas as pd
+import numpy as np
 from datetime import datetime, timezone
 from typing import Tuple, Dict, Set
 from collections import defaultdict
@@ -519,7 +520,21 @@ def run_cleaning_job(job_id: str, dataset_id: str, session_id: str, options: Cle
             if isinstance(options.keep_columns, list) and len(options.keep_columns) > 0:
                 if isinstance(options.keep_columns[0], dict):
                     # New format: list of dicts with index and name
-                    column_mapping = {int(item["index"]): item["name"] for item in options.keep_columns if "index" in item and "name" in item}
+                    try:
+                        column_mapping = {}
+                        for item in options.keep_columns:
+                            if isinstance(item, dict) and "index" in item and "name" in item:
+                                idx = item["index"]
+                                name = item["name"]
+                                # Convert index to int (handle both int and string)
+                                if isinstance(idx, str):
+                                    idx = int(idx)
+                                elif isinstance(idx, (np.integer, np.int64, np.int32)):
+                                    idx = int(idx)
+                                if isinstance(idx, int) and idx >= 0 and name:
+                                    column_mapping[idx] = str(name)
+                    except (ValueError, TypeError) as e:
+                        raise ValueError(f"Invalid keep_columns format: {e}")
                 else:
                     # Old format: list of strings (for backward compatibility, but won't work without headers)
                     # Try to map by name if headers exist, otherwise skip
@@ -564,7 +579,22 @@ def run_cleaning_job(job_id: str, dataset_id: str, session_id: str, options: Cle
         }).eq("dataset_id", dataset_id).execute()
 
         # Convert metrics to regular dict for JSON serialization
-        metrics_dict = dict(cleaning_metrics)
+        # Convert numpy/pandas types to native Python types
+        metrics_dict = {}
+        for key, value in cleaning_metrics.items():
+            # Convert numpy int64/float64 to native Python int/float
+            if isinstance(value, (np.integer, np.int64, np.int32)):
+                metrics_dict[key] = int(value)
+            elif isinstance(value, (np.floating, np.float64, np.float32)):
+                metrics_dict[key] = float(value)
+            elif isinstance(value, (int, float, str, bool)) or value is None:
+                metrics_dict[key] = value
+            else:
+                # Fallback: try to convert to int or string
+                try:
+                    metrics_dict[key] = int(value)
+                except (ValueError, TypeError):
+                    metrics_dict[key] = str(value)
         mark_job_completed(job_id, cleaned_path, metrics_dict)
         update_job_progress(job_id, 100, "Completed")
     except Exception as e:
