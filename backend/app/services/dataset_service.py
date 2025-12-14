@@ -173,6 +173,65 @@ def preview_dataset(dataset_id: str, session_id: str, use_cleaned: bool = False)
 
 
 # ---------------------------------------------------------
+# Get Full Dataset for Manual Labeling
+# ---------------------------------------------------------
+def get_full_dataset(dataset_id: str, session_id: str, use_cleaned: bool = True) -> dict | None:
+    """
+    Get all rows from dataset for manual labeling.
+    Returns dict with rows, total_count, and text_column_index.
+    """
+    dataset = get_dataset(dataset_id, session_id)
+    if not dataset:
+        return None
+
+    # Use cleaned_file if requested and available, otherwise use original_file
+    if use_cleaned and dataset.get("cleaned_file"):
+        filename = dataset["cleaned_file"]
+    else:
+        filename = dataset["original_file"]
+    
+    file_bytes = supabase.storage.from_(DATA_BUCKET).download(filename)
+
+    try:
+        # Decode bytes to text
+        text = None
+        for enc in ["utf-8", "utf-8-sig", "cp1252", "latin1"]:
+            try:
+                text = file_bytes.decode(enc)
+                break
+            except UnicodeDecodeError:
+                continue
+        if text is None:
+            text = file_bytes.decode("utf-8", errors="replace")
+
+        reader = csv.reader(io.StringIO(text))
+        rows = list(reader)
+        
+        # Find text column index (usually the longest text column)
+        text_col_idx = 0
+        if rows:
+            max_avg_len = 0
+            for col_idx in range(len(rows[0])):
+                try:
+                    avg_len = sum(len(str(row[col_idx])) for row in rows[:min(10, len(rows))]) / min(10, len(rows))
+                    if avg_len > max_avg_len and avg_len > 10:
+                        max_avg_len = avg_len
+                        text_col_idx = col_idx
+                except (IndexError, TypeError):
+                    continue
+
+        return {
+            "rows": rows,
+            "total_count": len(rows),
+            "text_column_index": text_col_idx,
+            "filename": filename
+        }
+
+    except Exception as e:
+        return {"rows": [], "total_count": 0, "text_column_index": 0, "error": str(e)}
+
+
+# ---------------------------------------------------------
 # Delete Dataset
 # ---------------------------------------------------------
 def delete_dataset(dataset_id: str, session_id: str):

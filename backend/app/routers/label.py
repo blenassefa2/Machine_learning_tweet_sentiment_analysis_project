@@ -196,3 +196,20 @@ def get_job(job_id: str):
         raise HTTPException(status_code=404, detail="Job not found")
     return res.data[0]
 
+
+# Get labeling result/summary by dataset_id
+@router.get("/{dataset_id}/labeling")
+def get_labeling_result(dataset_id: str, session_id: str):
+    """Get labeling result with summary from labelings table."""
+    res = supabase.table("labelings").select("*") \
+        .eq("dataset_id", dataset_id) \
+        .eq("session_id", session_id) \
+        .order("created_at", desc=True) \
+        .limit(1) \
+        .execute()
+    
+    if not res.data:
+        raise HTTPException(status_code=404, detail="No labeling found for this dataset")
+    
+    return res.data[0]
+

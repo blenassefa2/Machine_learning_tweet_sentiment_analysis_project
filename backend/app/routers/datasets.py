@@ -54,6 +54,16 @@ def preview_dataset(dataset_id: str, session_id: str, use_cleaned: bool = False)
     return {"preview": rows}
 
 
+# --------------------------- Full Data for Manual Labeling ----
+@router.get("/{dataset_id}/full")
+def get_full_dataset(dataset_id: str, session_id: str, use_cleaned: bool = True):
+    """Get all rows from dataset for manual labeling. Uses cleaned file by default."""
+    result = dataset_service.get_full_dataset(dataset_id, session_id, use_cleaned=use_cleaned)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Dataset not found")
+    return result
+
+
 # --------------------------- Download -------------------------
 @router.get("/{dataset_id}/download")
 def download_dataset(dataset_id: str, session_id: str):
