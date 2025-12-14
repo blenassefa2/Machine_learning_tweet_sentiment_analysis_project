@@ -3,54 +3,10 @@ import csv
 import io
 from datetime import datetime, timezone
 from fastapi import UploadFile
-import chardet
 from app.db.supabase_client import supabase
+import pandas as pd
 
 DATA_BUCKET = "datasets"
-
-
-def detect_and_convert_to_utf8(file_bytes: bytes) -> bytes:
-    """
-    Detect the encoding of file bytes and convert to UTF-8.
-    Handles various encodings like latin-1, cp1252, utf-16, etc.
-    """
-    # Try to detect encoding
-    detection = chardet.detect(file_bytes)
-    detected_encoding = detection.get('encoding', 'utf-8')
-    confidence = detection.get('confidence', 0)
-    
-    # If already UTF-8 or detection failed, try common encodings
-    if detected_encoding is None:
-        detected_encoding = 'utf-8'
-    
-    # List of encodings to try in order of priority
-    encodings_to_try = [detected_encoding]
-    
-    # Add fallback encodings if confidence is low
-    if confidence < 0.8:
-        common_encodings = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1', 'utf-16', 'ascii']
-        for enc in common_encodings:
-            if enc.lower() != detected_encoding.lower() and enc not in encodings_to_try:
-                encodings_to_try.append(enc)
-    
-    # Try each encoding
-    for encoding in encodings_to_try:
-        try:
-            # Decode with detected/fallback encoding
-            text = file_bytes.decode(encoding)
-            # Re-encode to UTF-8
-            utf8_bytes = text.encode('utf-8')
-            return utf8_bytes
-        except (UnicodeDecodeError, LookupError):
-            continue
-    
-    # Last resort: decode with errors='replace' to handle any remaining issues
-    try:
-        text = file_bytes.decode('utf-8', errors='replace')
-        return text.encode('utf-8')
-    except Exception:
-        # If all else fails, return original bytes
-        return file_bytes
 
 
 # ---------------------------------------------------------
@@ -63,12 +19,40 @@ def upload_dataset(file: UploadFile, session_id: str) -> dict:
     dataset_id = str(uuid.uuid4())
     filename = f"{dataset_id}_{file.filename}"
 
-    # Read and convert to UTF-8
-    file_bytes = file.file.read()
-    utf8_bytes = detect_and_convert_to_utf8(file_bytes)
+    # Normalize uploaded dataset to UTF-8 by parsing with pandas (handles different encodings)
+    # NOTE: We always read with header=None to preserve the original first row as data.
+    encodings_to_try = ["utf-8", "utf-8-sig", "cp1252", "latin1"]
+    df = None
+    last_err: Exception | None = None
 
-    # Upload file with UTF-8 encoding
-    supabase.storage.from_(DATA_BUCKET).upload(filename, utf8_bytes)
+    for enc in encodings_to_try:
+        try:
+            file.file.seek(0)
+            df = pd.read_csv(
+                file.file,
+                header=None,
+                dtype=str,
+                encoding=enc,
+                engine="python",
+            )
+            break
+        except UnicodeDecodeError as e:
+            last_err = e
+            continue
+        except Exception as e:
+            # Some files may parse but with unexpected delimiters; we'll still try other encodings first.
+            last_err = e
+            continue
+
+    if df is None:
+        raise ValueError(f"Unable to read uploaded file with supported encodings: {last_err}")
+
+    csv_buf = io.StringIO()
+    df.to_csv(csv_buf, index=False, header=False)
+    file_bytes = csv_buf.getvalue().encode("utf-8")
+
+    # Upload normalized UTF-8 CSV
+    supabase.storage.from_(DATA_BUCKET).upload(filename, file_bytes, {"contentType": "text/csv"})
 
     uploaded_at = datetime.now(timezone.utc)
 
@@ -162,8 +146,18 @@ def preview_dataset(dataset_id: str, session_id: str, use_cleaned: bool = False)
     file_bytes = supabase.storage.from_(DATA_BUCKET).download(filename)
 
     try:
-        # Decode bytes to text
-        text = file_bytes.decode("utf-8")
+        # Decode bytes to text (try common encodings; uploaded files should be UTF-8 after normalization)
+        text = None
+        for enc in ["utf-8", "utf-8-sig", "cp1252", "latin1"]:
+            try:
+                text = file_bytes.decode(enc)
+                break
+            except UnicodeDecodeError:
+                continue
+        if text is None:
+            # Last resort: replace invalid chars
+            text = file_bytes.decode("utf-8", errors="replace")
+
         reader = csv.reader(io.StringIO(text))
 
         rows = []
