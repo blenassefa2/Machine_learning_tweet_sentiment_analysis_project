@@ -121,16 +121,14 @@ def update_job(job_id: str, progress: int, message: str):
 def mark_job_running(job_id: str):
     supabase.table(JOB_TABLE).update({"status": "running", "started_at": _now_iso(), "progress": 1}).eq("job_id", job_id).execute()
 
-def mark_job_completed(job_id: str, labeled_path: str, summary: dict = None):
-    update_data = {
+def mark_job_completed(job_id: str, labeled_path: str):
+    """Mark job as completed. Summary is stored in labelings table, not here."""
+    supabase.table(JOB_TABLE).update({
         "status": "completed", 
         "finished_at": _now_iso(), 
         "progress": 100, 
         "labeled_file": labeled_path
-    }
-    if summary:
-        update_data["summary"] = summary
-    supabase.table(JOB_TABLE).update(update_data).eq("job_id", job_id).execute()
+    }).eq("job_id", job_id).execute()
 
 def mark_job_failed(job_id: str, message: str):
     supabase.table(JOB_TABLE).update({
@@ -353,20 +351,7 @@ def run_manual_labeling_job(job_id: str, dataset_id: str, session_id: str, annot
             "status": "Labeled"
         }).eq("dataset_id", dataset_id).execute()
         
-        # Calculate label distribution for summary
-        target_values = df.iloc[:, target_col_idx]
-        label_distribution = {
-            "0": int((target_values == 0).sum()),
-            "2": int((target_values == 2).sum()),
-            "4": int((target_values == 4).sum())
-        }
-        summary = {
-            "total": len(df),
-            "labeled": labeled_count,
-            "label_distribution": label_distribution
-        }
-        
-        mark_job_completed(job_id, path, summary)
+        mark_job_completed(job_id, path)
     except Exception as e:
         mark_job_failed(job_id, str(e))
         try:
@@ -446,19 +431,7 @@ def run_naive_labeling_job(job_id: str, dataset_id: str, session_id: str, keywor
             "status": "Labeled"
         }).eq("dataset_id", dataset_id).execute()
         
-        # Summary for naive labeling
-        summary = {
-            "total": len(df),
-            "labeled": int((labels != 2).sum()),
-            "neutral": int((labels == 2).sum()),
-            "label_distribution": {
-                "0": int((labels == 0).sum()),
-                "2": int((labels == 2).sum()),
-                "4": int((labels == 4).sum())
-            }
-        }
-        
-        mark_job_completed(job_id, path, summary)
+        mark_job_completed(job_id, path)
     except Exception as e:
         mark_job_failed(job_id, str(e))
         try:
@@ -542,8 +515,7 @@ def run_clustering_labeling_job(job_id: str, dataset_id: str, session_id: str, a
             "status": "Labeled"
         }).eq("dataset_id", dataset_id).execute()
         
-        # Summary for clustering labeling (already defined above)
-        mark_job_completed(job_id, path, summary)
+        mark_job_completed(job_id, path)
     except Exception as e:
         mark_job_failed(job_id, str(e))
         try:
