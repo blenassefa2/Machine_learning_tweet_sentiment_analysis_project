@@ -488,19 +488,8 @@ def run_cleaning_job(job_id: str, dataset_id: str, session_id: str, options: Cle
         
         # Detect encoding gracefully (similar to input_output.py)
         # Decode with graceful fallback
-        text = None
-        encodings_to_try = ["utf-8", "latin-1", "iso-8859-1", "cp1252", "windows-1252"]
-        
-        for enc in encodings_to_try:
-            try:
-                text = file_bytes.decode(enc)
-                break
-            except (UnicodeDecodeError, LookupError):
-                continue
-        
-        if text is None:
-            # Last resort: decode with errors='replace' using utf-8
-            text = file_bytes.decode("utf-8", errors="replace")
+       
+        text = file_bytes.decode("utf-8")
         
         # Read into pandas (CSV files don't have headers, first row is data)
         # Try to infer separator; default comma, no header row
