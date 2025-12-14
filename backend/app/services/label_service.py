@@ -372,23 +372,23 @@ def run_naive_labeling_job(job_id: str, dataset_id: str, session_id: str, keywor
         file_path = ds.get("cleaned_file") or ds["original_file"]
         df = _load_df_from_storage(file_path)
         
-        if use_default and not keyword_map:
-            # Load default keyword files from keywords bucket
-            # Files are comma-separated text files: positives.txt and negatives.txt
-            keyword_map = {}
-            for cname in ["positives", "negatives"]:
-                try:
-                    kb = supabase.storage.from_(KEYWORD_BUCKET).download(f"{cname}.txt")
-                    if kb:
-                        # Decode as latin-1 (can handle any byte sequence without errors)
-                        text = kb.decode("utf-8")
-                        # Parse comma-separated values: strip, lowercase, filter empty
-                        words = [word.strip().lower() for word in text.split(',') if word.strip()]
-                        if words:  # Only add if we got actual words
-                            keyword_map[cname] = words
-                except Exception as e:
-                    print(f"Error loading default keywords from {cname}.txt: {e}")
-                    continue
+       
+        # Load default keyword files from keywords bucket
+        # Files are comma-separated text files: positives.txt and negatives.txt
+        keyword_map = {}
+        for cname in ["positives", "negatives"]:
+            try:
+                kb = supabase.storage.from_(KEYWORD_BUCKET).download(f"{cname}.txt")
+                if kb:
+                    # Decode as latin-1 (can handle any byte sequence without errors)
+                    text = kb.decode("utf-8")
+                    # Parse comma-separated values: strip, lowercase, filter empty
+                    words = [word.strip().lower() for word in text.split(',') if word.strip()]
+                    if words:  # Only add if we got actual words
+                        keyword_map[cname] = words
+            except Exception as e:
+                print(f"Error loading default keywords from {cname}.txt: {e}")
+                continue
 
         if not keyword_map: 
             raise RuntimeError("No keywords provided for naive labeling")
