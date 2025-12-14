@@ -15,6 +15,7 @@ DATA_BUCKET = "datasets"
 CLASS_TABLE = "classifications"
 JOB_TABLE = "classify_jobs"
 DATASET_TABLE = "datasets"
+KEYWORD_BUCKET = "keywords"
 
 def _now_iso():
     return datetime.now(timezone.utc).isoformat()
@@ -200,14 +201,14 @@ def run_naive_job(job_id: str, dataset_id: str, session_id: str, keyword_map: Op
             # For simplicity: look for known class names
             for cname in ["positives","negatives"]:
                 try:
-                    kb = supabase.storage.from_(DATA_BUCKET).download(f"keywords/{cname}.txt")
+                    kb = supabase.storage.from_(KEYWORD_BUCKET).download(f"{cname}.txt")
                     if kb:
                         words = kb.decode("utf-8").splitlines()
                         keyword_map[cname] = words
                 except Exception:
                     continue
 
-        if not keyword_map:
+        if not keyword_map: 
             raise RuntimeError("No keywords provided for naive classification")
 
         update_job(job_id, 40, "Applying naive classification")
