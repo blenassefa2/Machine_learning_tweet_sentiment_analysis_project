@@ -3,21 +3,15 @@ import io
 import pickle
 import pandas as pd
 import numpy as np
+import heapq
+from collections import defaultdict, Counter
 from datetime import datetime, timezone
-from typing import Optional, Tuple
+from typing import Optional, List
 
-from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from sklearn.model_selection import train_test_split
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.naive_bayes import MultinomialNB, BernoulliNB
-from sklearn.tree import DecisionTreeClassifier
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support, confusion_matrix
 
 from app.db.supabase_client import supabase
-from app.models.train import (
-    KNNParams,
-    NaiveBayesParams
-)
 
 DATA_BUCKET = "datasets"
 MODEL_BUCKET = "models"
@@ -144,28 +138,171 @@ def extract_text_and_target(df: pd.DataFrame):
 
 
 # ------------------------------------------------------------
-# Vectorizers
+# Custom KNN Implementation (using Jaccard Distance)
 # ------------------------------------------------------------
 
-def build_naive_bayes_vectorizer(params: NaiveBayesParams):
-    ngram_map = {
-        "unigram": (1, 1),
-        "bigram": (1, 2),
-        "trigram": (1, 3),
-    }
-    return CountVectorizer(
-        ngram_range=ngram_map[params.ngram],
-        vocabulary=params.vocabulary,
-        binary=(params.feature_rep == "binary")
-    )
+def jaccard_distance(tweet1: str, tweet2: str) -> float:
+    """Calculate Jaccard Distance between two tweets."""
+    set1 = set(tweet1.lower().split())
+    set2 = set(tweet2.lower().split())
+    
+    if not set1 and not set2:
+        return 0.0
+    
+    intersection_size = len(set1.intersection(set2))
+    union_size = len(set1.union(set2))
+    
+    jaccard_similarity = intersection_size / union_size
+    return 1.0 - jaccard_similarity
 
 
-def build_tfidf_vectorizer():
-    return TfidfVectorizer(max_features=5000, stop_words="english")
+class CustomKNN:
+    """Custom KNN classifier using Jaccard distance."""
+    
+    def __init__(self, k: int = 5):
+        self.k = k
+        self.knowledge_base = []
+    
+    def fit(self, X_train: List[str], y_train):
+        """Store training data as knowledge base."""
+        self.knowledge_base = list(zip(X_train, y_train))
+        return self
+    
+    def predict_one(self, new_tweet: str) -> int:
+        """Predict class for a single tweet using KNN."""
+        closest_neighbors = []
+        heapq.heapify(closest_neighbors)
+        
+        distances = {}
+        for tweet, c in self.knowledge_base:
+            distances[tweet] = jaccard_distance(tweet, new_tweet)
+        
+        for tweet, c in self.knowledge_base:
+            if len(closest_neighbors) < self.k:
+                heapq.heappush(closest_neighbors, (-distances[tweet], c))
+            else:
+                top_distance, top_c = heapq.heappop(closest_neighbors)
+                new_distance = distances[tweet]
+                
+                if -top_distance > new_distance:
+                    heapq.heappush(closest_neighbors, (-new_distance, c))
+                else:
+                    heapq.heappush(closest_neighbors, (top_distance, top_c))
+        
+        frequency = defaultdict(int)
+        for distance, c in closest_neighbors:
+            frequency[c] += 1
+        
+        majority = -1
+        result = 0
+        for class_ in frequency:
+            if frequency[class_] > majority:
+                majority = frequency[class_]
+                result = class_
+        
+        return result
+    
+    def predict(self, X_test: List[str]) -> List[int]:
+        """Predict classes for multiple tweets."""
+        return [self.predict_one(tweet) for tweet in X_test]
 
 
 # ------------------------------------------------------------
-# Naive Automatic
+# Custom Naive Bayes Implementation
+# ------------------------------------------------------------
+
+class CustomNaiveBayes:
+    """Custom Naive Bayes classifier."""
+    
+    def __init__(self, ngram: str = "unigram", feature_rep: str = "count"):
+        self.ngram = ngram
+        self.feature_rep = feature_rep
+        self.Pxy = defaultdict(dict)  # P(word | class)
+        self.class_prior = {}  # P(class)
+        self.vocabulary = set()
+    
+    def _tokenize(self, text: str) -> List[str]:
+        """Tokenize text based on ngram setting."""
+        words = text.lower().split()
+        
+        if self.ngram == "unigram":
+            return words
+        elif self.ngram == "bigram":
+            tokens = words.copy()
+            for i in range(len(words) - 1):
+                tokens.append(f"{words[i]}_{words[i+1]}")
+            return tokens
+        elif self.ngram == "trigram":
+            tokens = words.copy()
+            for i in range(len(words) - 1):
+                tokens.append(f"{words[i]}_{words[i+1]}")
+            for i in range(len(words) - 2):
+                tokens.append(f"{words[i]}_{words[i+1]}_{words[i+2]}")
+            return tokens
+        return words
+    
+    def fit(self, X_train: List[str], y_train):
+        """Train the Naive Bayes classifier."""
+        y_train = list(y_train)
+        
+        # Build vocabulary
+        for text in X_train:
+            for word in self._tokenize(text):
+                self.vocabulary.add(word)
+        
+        # Count words per class
+        word_counts = defaultdict(Counter)
+        total_words = defaultdict(int)
+        class_counts = Counter(y_train)
+        
+        for text, c in zip(X_train, y_train):
+            tokens = self._tokenize(text)
+            if self.feature_rep == "binary":
+                tokens = list(set(tokens))  # Unique tokens only
+            
+            for word in tokens:
+                word_counts[c][word] += 1
+                total_words[c] += 1
+        
+        # Compute class priors P(class)
+        total_samples = len(y_train)
+        for c in class_counts:
+            self.class_prior[c] = np.log(class_counts[c] / total_samples)
+        
+        # Compute P(word | class) with Laplace smoothing
+        V = len(self.vocabulary)
+        for c in class_counts:
+            self.Pxy[c] = {}
+            for word in self.vocabulary:
+                numer = word_counts[c][word] + 1
+                denom = total_words[c] + V
+                self.Pxy[c][word] = np.log(numer / denom)
+        
+        return self
+    
+    def predict_one(self, text: str) -> int:
+        """Predict class for a single text."""
+        tokens = self._tokenize(text)
+        if self.feature_rep == "binary":
+            tokens = list(set(tokens))
+        
+        scores = {}
+        for c in self.class_prior:
+            log_prob = self.class_prior[c]
+            for word in tokens:
+                if word in self.Pxy[c]:
+                    log_prob += self.Pxy[c][word]
+            scores[c] = log_prob
+        
+        return max(scores, key=scores.get)
+    
+    def predict(self, X_test: List[str]) -> List[int]:
+        """Predict classes for multiple texts."""
+        return [self.predict_one(text) for text in X_test]
+
+
+# ------------------------------------------------------------
+# Naive Automatic (Keyword-based classification)
 # ------------------------------------------------------------
 
 def load_sentiment_wordlists():
@@ -175,7 +312,7 @@ def load_sentiment_wordlists():
     
     try:
         pos_raw = supabase.storage.from_(KEYWORD_BUCKET).download("positives.txt")
-        text = pos_raw.decode("utf-8")  # Use latin-1 to handle any encoding
+        text = pos_raw.decode("utf-8")
         positive = set([word.strip().lower() for word in text.split(',') if word.strip()])
     except Exception as e:
         print(f"Error loading positives.txt: {e}")
@@ -188,42 +325,42 @@ def load_sentiment_wordlists():
         print(f"Error loading negatives.txt: {e}")
     
     if not positive and not negative:
-        raise RuntimeError("Could not load keyword files from storage. Please ensure positives.txt and negatives.txt exist in the keywords bucket.")
+        raise RuntimeError("Could not load keyword files from storage.")
     
     return positive, negative
 
 
+class NaiveAutomaticClassifier:
+    """Keyword-based classifier using positive/negative word lists. Returns 0, 2, 4."""
+    
+    def __init__(self, positive_words: set, negative_words: set):
+        self.positive = positive_words
+        self.negative = negative_words
+    
+    def predict_one(self, text: str) -> int:
+        """Classify a single text. Returns 0 (neg), 2 (neutral), 4 (pos)."""
+        tweet = text.lower()
+        pos_count = sum(1 for w in self.positive if w in tweet)
+        neg_count = sum(1 for w in self.negative if w in tweet)
+        
+        if pos_count > neg_count:
+            return 4  # Positive
+        elif neg_count > pos_count:
+            return 0  # Negative
+        else:
+            return 2  # Neutral
+    
+    def predict(self, X_test: List[str]) -> List[int]:
+        """Predict classes for multiple texts."""
+        return [self.predict_one(text) for text in X_test]
+
+
 def train_naive_automatic():
+    """Create a NaiveAutomaticClassifier with loaded word lists."""
     positive, negative = load_sentiment_wordlists()
-    return {
-        "type": "naive_automatic",
-        "positive_words": list(positive),
-        "negative_words": list(negative),
-    }
+    return NaiveAutomaticClassifier(positive, negative)
 
 
-# ------------------------------------------------------------
-# Training Algorithms
-# ------------------------------------------------------------
-
-def train_knn(X_train, y_train, params: KNNParams):
-    return KNeighborsClassifier(
-        n_neighbors=params.k,
-        metric=params.distance
-    ).fit(X_train, y_train)
-
-
-def train_naive_bayes(X_train, y_train, params: NaiveBayesParams):
-    model = BernoulliNB() if params.feature_rep == "binary" else MultinomialNB()
-    return model.fit(X_train, y_train)
-
-
-def train_decision_tree(X_train, y_train, params: dict):
-    clf = DecisionTreeClassifier(
-        max_depth=params.get("max_depth"), 
-        min_samples_split=params.get("min_samples_split", 2)
-    )
-    return clf.fit(X_train, y_train)
 
 
 # ------------------------------------------------------------
@@ -343,63 +480,61 @@ def run_training_job(job_id: str, model_id: str, dataset_id: str, session_id: st
         # Dispatch Algorithm
         update_job(job_id, 50, f"Training {algorithm}")
         
-        vectorizer = None  # default null
+        # Convert to lists for custom implementations
+        X_train_list = X_train.tolist() if hasattr(X_train, 'tolist') else list(X_train)
+        X_val_list = X_val.tolist() if hasattr(X_val, 'tolist') else list(X_val)
+        y_train_list = y_train.tolist() if hasattr(y_train, 'tolist') else list(y_train)
+        y_val_list = y_val.tolist() if hasattr(y_val, 'tolist') else list(y_val)
 
         if algorithm == "knn":
-            params = KNNParams(**hyperparams)
-            vectorizer = build_tfidf_vectorizer()
-            X_train_vec = vectorizer.fit_transform(X_train)
-            X_val_vec = vectorizer.transform(X_val)
-            model = train_knn(X_train_vec, y_train, params)
+            # Custom KNN with Jaccard distance
+            k = hyperparams.get("k", 5)
+            model = CustomKNN(k=k)
+            model.fit(X_train_list, y_train_list)
+            preds = model.predict(X_val_list)
+            metrics = compute_metrics(y_val_list, preds)
 
         elif algorithm == "naive_bayes":
-            params = NaiveBayesParams(**hyperparams)
-            vectorizer = build_naive_bayes_vectorizer(params)
-            X_train_vec = vectorizer.fit_transform(X_train)
-            X_val_vec = vectorizer.transform(X_val)
-            model = train_naive_bayes(X_train_vec, y_train, params)
+            # Custom Naive Bayes
+            ngram = hyperparams.get("ngram", "unigram")
+            feature_rep = hyperparams.get("feature_rep", "count")
+            model = CustomNaiveBayes(ngram=ngram, feature_rep=feature_rep)
+            model.fit(X_train_list, y_train_list)
+            preds = model.predict(X_val_list)
+            metrics = compute_metrics(y_val_list, preds)
 
         elif algorithm == "naive_automatic":
+            # Keyword-based classification (returns 0, 2, 4)
             model = train_naive_automatic()
-            positive = set(model["positive_words"])
-            negative = set(model["negative_words"])
-
-            def classify(t):
-                tokens = t.lower().split()
-                pos = len([x for x in tokens if x in positive])
-                neg = len([x for x in tokens if x in negative])
-                if pos > neg: return 1
-                if neg > pos: return -1
-                return 0
-
-            preds = [classify(t) for t in X_val]
-            metrics = compute_metrics(y_val, preds)
-            vectorizer = None
+            preds = model.predict(X_val_list)
+            metrics = compute_metrics(y_val_list, preds)
 
         elif algorithm == "decision_tree":
-            params = hyperparams
-            vectorizer = build_tfidf_vectorizer()
+            # Keep sklearn for decision tree as no custom implementation provided
+            from sklearn.tree import DecisionTreeClassifier
+            from sklearn.feature_extraction.text import TfidfVectorizer
+            vectorizer = TfidfVectorizer(max_features=5000, stop_words="english")
             X_train_vec = vectorizer.fit_transform(X_train)
             X_val_vec = vectorizer.transform(X_val)
-            model = train_decision_tree(X_train_vec, y_train, params)
+            max_depth = hyperparams.get("max_depth", None)
+            model = DecisionTreeClassifier(max_depth=max_depth, random_state=42)
+            model.fit(X_train_vec, y_train)
+            preds = model.predict(X_val_vec)
+            metrics = compute_metrics(y_val, preds)
 
         else:
             raise RuntimeError("Unknown algorithm.")
 
-        # Compute metrics for ML models (except naive_automatic)
-        if algorithm != "naive_automatic":
-            preds = model.predict(X_val_vec)
-            metrics = compute_metrics(y_val, preds)
-
         update_job(job_id, 80, "Saving model")
 
-        # Save model
+        # Save model - include vectorizer only for decision_tree
         model_artifact = {
             "algorithm": algorithm,
             "hyperparameters": hyperparams,
-            "vectorizer": vectorizer,
             "model": model,
         }
+        if algorithm == "decision_tree":
+            model_artifact["vectorizer"] = vectorizer
 
         model_path = save_model_artifact(model_id, model_artifact)
 
