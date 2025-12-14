@@ -198,7 +198,7 @@ def run_naive_job(job_id: str, dataset_id: str, session_id: str, keyword_map: Op
             keyword_map = {}
             # list stored files under keywords folder and load...
             # For simplicity: look for known class names
-            for cname in ["positive","negative","pos","neg"]:
+            for cname in ["positives","negatives"]:
                 try:
                     kb = supabase.storage.from_(DATA_BUCKET).download(f"keywords/{cname}.txt")
                     if kb:
