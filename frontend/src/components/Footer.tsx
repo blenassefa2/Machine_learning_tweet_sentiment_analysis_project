@@ -1,5 +1,5 @@
 import { Box, Typography, IconButton } from '@mui/material';
-import { GitHub, Twitter, LinkedIn } from '@mui/icons-material';
+import { GitHub, Language, LinkedIn } from '@mui/icons-material';
 import { keyframes } from '@emotion/react';
 
 const primaryColor = '#646cff';
@@ -39,6 +39,7 @@ const Footer = () => {
       </Typography>
       <Box sx={{ display: 'flex', gap: 1 }}>
         <IconButton
+          href="https://github.com/blenassefa2"
           color="inherit"
           sx={{
             color: '#fff',
@@ -52,7 +53,9 @@ const Footer = () => {
         >
           <GitHub />
         </IconButton>
+    
         <IconButton
+          href="https://www.blen-tilahun.site"
           color="inherit"
           sx={{
             color: '#fff',
@@ -64,9 +67,10 @@ const Footer = () => {
             },
           }}
         >
-          <Twitter />
+          <Language />
         </IconButton>
         <IconButton
+          href="https://www.linkedin.com/in/blen-tilahun/"
           color="inherit"
           sx={{
             color: '#fff',

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import {
   Box,
   Typography,
@@ -7,8 +7,12 @@ import {
   Container,
   useMediaQuery,
   useTheme,
+  Dialog,
+  DialogContent,
+  CircularProgress,
+  LinearProgress,
 } from "@mui/material";
-import { CloudUpload } from "@mui/icons-material";
+import { CloudUpload, CheckCircle, Error as ErrorIcon } from "@mui/icons-material";
 import { keyframes } from "@emotion/react";
 import { useSession } from "../context/SessionContext";
 import { uploadDataset } from "../api/datasets";
@@ -26,10 +30,29 @@ const fadeInUp = keyframes`
   }
 `;
 
+const pulseAnimation = keyframes`
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.8;
+  }
+`;
+
+type UploadStatus = 'idle' | 'uploading' | 'success' | 'error';
+
 const FileUpload = () => {
   const [isDragging, setIsDragging] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState<UploadStatus>('idle');
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadedDatasetId, setUploadedDatasetId] = useState<string>("");
+  const [uploadedFileName, setUploadedFileName] = useState<string>("");
+  const [errorMessage, setErrorMessage] = useState<string>("");
+  const [modalOpen, setModalOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const { sessionId } = useSession();
@@ -60,24 +83,65 @@ const FileUpload = () => {
     }
   };
 
+  // Reset file input to allow re-selecting the same file
+  const resetFileInput = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   // ---------------- Upload Function ----------------
   const uploadFile = async (file: File) => {
+    // Reset state for new upload
+    setUploadStatus('uploading');
+    setUploadProgress(0);
+    setUploadedDatasetId("");
+    setUploadedFileName(file.name);
+    setErrorMessage("");
+    setModalOpen(true);
+    resetFileInput();
+
+    // Simulate progress since axios doesn't give real upload progress without config
+    const progressInterval = setInterval(() => {
+      setUploadProgress(prev => {
+        if (prev >= 90) {
+          clearInterval(progressInterval);
+          return 90;
+        }
+        return prev + Math.random() * 15;
+      });
+    }, 200);
+
     try {
       const data = await uploadDataset(file, sessionId);
-      
-      
-      setUploadedDatasetId(data.dataset_id);
+      clearInterval(progressInterval);
       setUploadProgress(100);
-      setTimeout(() => setUploadProgress(0), 1500); // reset after showing
-    } catch (err) {
+      setUploadedDatasetId(data.dataset_id);
+      setUploadStatus('success');
+    } catch (err: any) {
+      clearInterval(progressInterval);
       console.error("Upload failed:", err);
-      setUploadProgress(0);
+      setUploadStatus('error');
+      setErrorMessage(err.response?.data?.detail || err.message || "Upload failed. Please try again.");
+    }
+  };
+
+  // ---------------- Modal Close ----------------
+  const handleCloseModal = () => {
+    setModalOpen(false);
+    // Keep success state visible briefly
+    if (uploadStatus === 'success') {
+      setTimeout(() => {
+        setUploadStatus('idle');
+      }, 500);
+    } else {
+      setUploadStatus('idle');
     }
   };
 
   // ---------------- Render ----------------
   return (
-    <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", py: { xs: 6, md: 10 } }}>
+    <Box id="file-upload" sx={{ display: "flex", alignItems: "center", justifyContent: "center", py: { xs: 6, md: 10 } }}>
       <Container maxWidth="lg" sx={{ width: "100%" }}>
         <Box sx={{ mb: 4 }}>
           <Typography
@@ -113,23 +177,48 @@ const FileUpload = () => {
               Drop your CSV or TXT here or click to select
             </Typography>
 
-            <input type="file" hidden id="file-upload" onChange={handleFileSelect} accept=".csv,.txt" />
+            <input 
+              type="file" 
+              hidden 
+              id="file-upload" 
+              ref={fileInputRef}
+              onChange={handleFileSelect} 
+              accept=".csv,.txt" 
+            />
             <label htmlFor="file-upload">
-              <Button component="span" variant="contained" sx={{ backgroundColor: primaryColor, color: "#fff", px: 4, py: 1.5, '&:hover': { backgroundColor: "#5058e6", transform: "scale(1.05)" } }}>
+              <Button 
+                component="span" 
+                variant="contained" 
+                disabled={uploadStatus === 'uploading'}
+                sx={{ 
+                  backgroundColor: primaryColor, 
+                  color: "#fff", 
+                  px: 4, 
+                  py: 1.5, 
+                  '&:hover': { backgroundColor: "#5058e6", transform: "scale(1.05)" },
+                  '&:disabled': { backgroundColor: "#444", color: "#888" }
+                }}
+              >
                 Browse Files
               </Button>
             </label>
 
-            {uploadProgress > 0 && (
-              <Box sx={{ mt: 2, width: "100%", backgroundColor: "#222", borderRadius: 1 }}>
-                <Box sx={{ width: `${uploadProgress}%`, height: 8, backgroundColor: primaryColor, borderRadius: 1, transition: "width 0.3s ease" }} />
+            {/* Show last uploaded file info */}
+            {uploadStatus === 'success' && uploadedDatasetId && !modalOpen && (
+              <Box sx={{ mt: 3, p: 2, backgroundColor: "rgba(76, 175, 80, 0.1)", borderRadius: 2, border: "1px solid rgba(76, 175, 80, 0.3)" }}>
+                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 1, mb: 1 }}>
+                  <CheckCircle sx={{ color: "#4caf50", fontSize: 20 }} />
+                  <Typography sx={{ color: "#4caf50", fontWeight: 600 }}>
+                    Upload Successful!
+                  </Typography>
+                </Box>
+                <Typography sx={{ color: "#999", fontSize: "0.875rem" }}>
+                  {uploadedFileName}
+                </Typography>
+                <Typography sx={{ color: "#ccc", fontSize: "0.75rem", mt: 0.5 }}>
+                  Dataset ID: {uploadedDatasetId}
+                </Typography>
               </Box>
-            )}
-
-            {uploadedDatasetId && (
-              <Typography sx={{ mt: 1, textAlign: "center", color: "#fff" }}>
-                Uploaded successfully! Dataset ID: {uploadedDatasetId}
-              </Typography>
             )}
           </Paper>
 
@@ -138,6 +227,140 @@ const FileUpload = () => {
           </Typography>
         </Box>
       </Container>
+
+      {/* Upload Progress Modal */}
+      <Dialog
+        open={modalOpen}
+        onClose={uploadStatus !== 'uploading' ? handleCloseModal : undefined}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{
+          sx: {
+            backgroundColor: '#0f0f11',
+            border: '1px solid #1a1a1c',
+            borderRadius: 2,
+          },
+        }}
+      >
+        <DialogContent>
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, py: 3 }}>
+            {uploadStatus === 'uploading' && (
+              <>
+                <Box sx={{ position: 'relative' }}>
+                  <CircularProgress
+                    size={80}
+                    thickness={4}
+                    sx={{ color: primaryColor }}
+                  />
+                  <Box
+                    sx={{
+                      position: 'absolute',
+                      top: '50%',
+                      left: '50%',
+                      transform: 'translate(-50%, -50%)',
+                    }}
+                  >
+                    <CloudUpload sx={{ fontSize: 32, color: primaryColor, animation: `${pulseAnimation} 1.5s ease-in-out infinite` }} />
+                  </Box>
+                </Box>
+                <Typography sx={{ color: '#fff', fontWeight: 600, fontSize: '1.1rem' }}>
+                  Uploading...
+                </Typography>
+                <Typography sx={{ color: '#999', fontSize: '0.875rem', textAlign: 'center' }}>
+                  {uploadedFileName}
+                </Typography>
+                <Box sx={{ width: '100%' }}>
+                  <LinearProgress
+                    variant="determinate"
+                    value={uploadProgress}
+                    sx={{
+                      height: 8,
+                      borderRadius: 4,
+                      backgroundColor: '#1a1a1c',
+                      '& .MuiLinearProgress-bar': {
+                        backgroundColor: primaryColor,
+                        borderRadius: 4,
+                      },
+                    }}
+                  />
+                  <Typography sx={{ color: '#666', fontSize: '0.75rem', textAlign: 'center', mt: 1 }}>
+                    {Math.round(uploadProgress)}%
+                  </Typography>
+                </Box>
+              </>
+            )}
+
+            {uploadStatus === 'success' && (
+              <>
+                <CheckCircle sx={{ fontSize: 80, color: '#4caf50' }} />
+                <Typography sx={{ color: '#fff', fontWeight: 600, fontSize: '1.1rem' }}>
+                  Upload Complete!
+                </Typography>
+                <Box sx={{ textAlign: 'center' }}>
+                  <Typography sx={{ color: '#999', fontSize: '0.875rem' }}>
+                    {uploadedFileName}
+                  </Typography>
+                  <Typography sx={{ color: '#ccc', fontSize: '0.75rem', mt: 1, fontFamily: 'monospace' }}>
+                    ID: {uploadedDatasetId}
+                  </Typography>
+                </Box>
+                <Button
+                  onClick={handleCloseModal}
+                  variant="contained"
+                  sx={{
+                    backgroundColor: primaryColor,
+                    color: '#fff',
+                    px: 4,
+                    mt: 1,
+                    '&:hover': { backgroundColor: '#5058e6' },
+                  }}
+                >
+                  Done
+                </Button>
+              </>
+            )}
+
+            {uploadStatus === 'error' && (
+              <>
+                <ErrorIcon sx={{ fontSize: 80, color: '#f44336' }} />
+                <Typography sx={{ color: '#fff', fontWeight: 600, fontSize: '1.1rem' }}>
+                  Upload Failed
+                </Typography>
+                <Typography sx={{ color: '#999', fontSize: '0.875rem', textAlign: 'center' }}>
+                  {errorMessage}
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 2, mt: 1 }}>
+                  <Button
+                    onClick={handleCloseModal}
+                    variant="outlined"
+                    sx={{
+                      borderColor: '#444',
+                      color: '#ccc',
+                      '&:hover': { borderColor: '#666', backgroundColor: 'rgba(255,255,255,0.05)' },
+                    }}
+                  >
+                    Close
+                  </Button>
+                  <label htmlFor="file-upload">
+                    <Button
+                      component="span"
+                      variant="contained"
+                      onClick={() => setModalOpen(false)}
+                      sx={{
+                        backgroundColor: primaryColor,
+                        color: '#fff',
+                        '&:hover': { backgroundColor: '#5058e6' },
+                      }}
+                    >
+                      Try Again
+                    </Button>
+                  </label>
+                </Box>
+              </>
+            )}
+          </Box>
+        </DialogContent>
+      </Dialog>
     </Box>
   );
 };

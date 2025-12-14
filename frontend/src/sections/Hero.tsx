@@ -87,9 +87,7 @@ const Hero = () => {
               animation: `${fadeInUp} 1s ease-out 0.2s both`,
             }}
           >
-            Upload your data, clean it, classify it using automated or manual methods, and evaluate
-            model performance—all in one place. Train models, make predictions, and explore
-            clustering-based insights effortlessly.
+             Train models, make predictions, and explore clustering-based insights effortlessly. Full Machine learning pipeline from data cleaning to model prediction and evaluations all in one place.
           </Typography>
         </Box>
 

@@ -71,35 +71,14 @@ const Navbar = () => {
               >
                 Documentation
               </Button>
-              <Button
-                color="inherit"
-                sx={{
-                  textTransform: 'none',
-                  transition: 'all 0.3s ease',
-                  '&:hover': {
-                    color: '#646cff',
-                    transform: 'translateY(-2px)',
-                  },
-                }}
-              >
-                Models
-              </Button>
-              <Button
-                color="inherit"
-                sx={{
-                  textTransform: 'none',
-                  transition: 'all 0.3s ease',
-                  '&:hover': {
-                    color: '#646cff',
-                    transform: 'translateY(-2px)',
-                  },
-                }}
-              >
-                Support
-              </Button>
+              
+              
             </>
           )}
           <Button
+            onClick={() => {
+              window.location.href = '/#file-upload';
+            }}
             variant="contained"
             sx={{
               backgroundColor: '#fff',
