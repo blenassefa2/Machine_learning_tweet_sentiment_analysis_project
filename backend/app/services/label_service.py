@@ -18,6 +18,7 @@ DATA_BUCKET = "datasets"
 LABEL_TABLE = "labelings"  # Renamed from classifications
 JOB_TABLE = "label_jobs"  # Renamed from classify_jobs
 DATASET_TABLE = "datasets"
+KEYWORD_BUCKET = "keywords"
 
 def _now_iso():
     return datetime.now(timezone.utc).isoformat()
@@ -370,38 +371,23 @@ def run_naive_labeling_job(job_id: str, dataset_id: str, session_id: str, keywor
         file_path = ds.get("cleaned_file") or ds["original_file"]
         df = _load_df_from_storage(file_path)
         
-        # Load default keyword files if use_default is True or if no keyword_map was provided
-        if (use_default or not keyword_map):
-            # Load default keyword files from Supabase storage
-            # Expected paths: keyword/positives.txt and keyword/negatives.txt
-            if not keyword_map:
-                keyword_map = {}
-            
-            # Try loading from keyword/positives.txt and keyword/negatives.txt
-            keyword_paths = [
-                ("positive", "keyword/positives.txt"),
-                ("negative", "keyword/negatives.txt"),
-                # Fallback: try alternative paths for backward compatibility
-                ("pos", "keywords/pos.txt"),
-                ("neg", "keywords/neg.txt"),
-                ("positive", "keywords/positive.txt"),
-                ("negative", "keywords/negative.txt"),
-            ]
-            
-            for label_key, storage_path in keyword_paths:
-                if label_key in keyword_map:  # Skip if already loaded
-                    continue
+        if use_default or not keyword_map:
+            # load default files for classes; assume file names stored in storage keywords/
+            # We expect files: keywords/pos.txt, keywords/neg.txt OR a mapping you define.
+            keyword_map = {}
+            # list stored files under keywords folder and load...
+            # For simplicity: look for known class names
+            for cname in ["positives","negatives"]:
                 try:
-                    kb = supabase.storage.from_(DATA_BUCKET).download(storage_path)
+                    kb = supabase.storage.from_(KEYWORD_BUCKET).download(f"{cname}.txt")
                     if kb:
-                        words = [w.strip() for w in kb.decode("utf-8").splitlines() if w.strip()]
-                        if words:  # Only add if we got actual words
-                            keyword_map[label_key] = words
+                        words = kb.decode("utf-8").splitlines()
+                        keyword_map[cname] = words
                 except Exception:
                     continue
-        
-        if not keyword_map:
-            raise RuntimeError("No keywords provided for naive labeling. Please ensure keyword/positives.txt and keyword/negatives.txt exist in Supabase storage, or provide a keyword_map.")
+
+        if not keyword_map: 
+            raise RuntimeError("No keywords provided for naive classification")
         
         text_col_idx = _find_text_column_index(df)
         update_job(job_id, 40, "Applying naive labeling")
