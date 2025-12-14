@@ -29,7 +29,7 @@ def upload_dataset(file: UploadFile, session_id: str) -> dict:
     # Basic validation: try to detect if it's a valid text file
     # Use chardet to check encoding (like input_output.py)
     text = None
-    encodings_to_try = ["utf-8", "latin-1", "iso-8859-1", "cp1252", "windows-1252"]
+    encodings_to_try = [ "latin-1", "iso-8859-1", "cp1252", "windows-1252"]
     
     for enc in encodings_to_try:
         try:
