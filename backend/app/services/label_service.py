@@ -329,6 +329,14 @@ def run_manual_labeling_job(job_id: str, dataset_id: str, session_id: str, annot
         
         # Write labeling metadata
         labeled_count = int((df.iloc[:, target_col_idx] != -1).sum())
+        # Calculate label distribution for manual labeling
+        target_values = df.iloc[:, target_col_idx]
+        label_distribution = {
+            "0": int((target_values == 0).sum()),
+            "2": int((target_values == 2).sum()),
+            "4": int((target_values == 4).sum())
+        }
+        
         supabase.table(LABEL_TABLE).insert({
             "labeling_id": str(uuid.uuid4()),
             "dataset_id": dataset_id,
@@ -337,9 +345,11 @@ def run_manual_labeling_job(job_id: str, dataset_id: str, session_id: str, annot
             "hyperparameters": {"annotations_count": len(annotations), "stop_early": stop_early},
             "results": df.head(50).to_dict(orient="records") if len(df) > 0 else [],
             "summary": {
+                "total": len(df),
                 "total_rows": len(df),
                 "labeled_rows": labeled_count,
-                "unlabeled_rows": len(df) - labeled_count
+                "unlabeled_rows": len(df) - labeled_count,
+                "label_distribution": label_distribution
             },
             "labeled_file": path,
             "status": "completed",
@@ -419,7 +429,12 @@ def run_naive_labeling_job(job_id: str, dataset_id: str, session_id: str, keywor
             "summary": {
                 "total": len(df),
                 "labeled": int((labels != 2).sum()),  # Non-neutral
-                "neutral": int((labels == 2).sum())
+                "neutral": int((labels == 2).sum()),
+                "label_distribution": {
+                    "0": int((labels == 0).sum()),
+                    "2": int((labels == 2).sum()),
+                    "4": int((labels == 4).sum())
+                }
             },
             "labeled_file": path,
             "status": "completed",
