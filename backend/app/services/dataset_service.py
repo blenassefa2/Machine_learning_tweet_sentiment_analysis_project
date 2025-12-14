@@ -13,11 +13,7 @@ except ImportError:
 
 DATA_BUCKET = "datasets"
 
-def decode_file_bytes(file_bytes: bytes) -> str:
-    try:
-        return file_bytes.decode("utf-8")
-    except UnicodeDecodeError:
-        return file_bytes.decode("latin-1")
+
 # ---------------------------------------------------------
 # Upload Dataset
 # ---------------------------------------------------------
@@ -30,21 +26,25 @@ def upload_dataset(file: UploadFile, session_id: str) -> dict:
 
     file_bytes = file.file.read()
     
-    # Basic validation: if it is different encoding change it to utf-8 and save it to supabse bucket
-    try:
-        # Decode with fallback
-        text = decode_file_bytes(file_bytes)
-        # OPTIONAL: extract CSV/TXT content like before
-        data = [word.strip().lower() for word in text.split(",") if word.strip()]
-
-        # Re-encode to UTF-8 before upload
-        utf8_bytes = text.encode("utf-8")
-        # Upload file
-        supabase.storage.from_(DATA_BUCKET).upload(filename, utf8_bytes)
-
-    except Exception as e:
-        raise RuntimeError(f"Failed to process file: {e}")
+    # Basic validation: try to detect if it's a valid text file
+    # Use chardet to check encoding (like input_output.py)
+    text = None
+    encodings_to_try = ["utf-8", "latin-1", "iso-8859-1", "cp1252", "windows-1252"]
+    
+    for enc in encodings_to_try:
+        try:
+            text = file_bytes.decode(enc)
+            break
+        except (UnicodeDecodeError, LookupError, AttributeError):
+            continue
+    
+    if text is None:
+        # Last resort: decode with errors='replace' using utf-8
+        text = file_bytes.decode("utf-8", errors="ignore")
         
+    # Upload file
+    supabase.storage.from_(DATA_BUCKET).upload(filename, text.encode("utf-8"))
+
     uploaded_at = datetime.now(timezone.utc)
 
     # Create database metadata
@@ -142,8 +142,8 @@ def preview_dataset(dataset_id: str, session_id: str, use_cleaned: bool = False)
 
     try:
         # Detect encoding using chardet (like input_output.py)
-       
         text = file_bytes.decode("utf-8")
+        
         
         # Parse CSV (like input_output.py)
         reader = csv.reader(io.StringIO(text))
