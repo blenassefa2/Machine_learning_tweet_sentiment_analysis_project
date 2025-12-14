@@ -371,20 +371,21 @@ def run_naive_labeling_job(job_id: str, dataset_id: str, session_id: str, keywor
         file_path = ds.get("cleaned_file") or ds["original_file"]
         df = _load_df_from_storage(file_path)
         
-        if use_default or not keyword_map:
-            # load default files for classes; assume file names stored in storage keywords/
-            # We expect files: keywords/pos.txt, keywords/neg.txt OR a mapping you define.
-            keyword_map = {}
-            # list stored files under keywords folder and load...
-            # For simplicity: look for known class names
-            for cname in ["positives","negatives"]:
-                try:
-                    kb = supabase.storage.from_(KEYWORD_BUCKET).download(f"{cname}.txt")
-                    if kb:
-                        words = kb.decode("utf-8").splitlines()
-                        keyword_map[cname] = words
-                except Exception:
-                    continue
+        
+        # load default files for classes; assume file names stored in storage keywords/
+        # We expect files: keywords/pos.txt, keywords/neg.txt OR a mapping you define.
+        keyword_map = {}
+        # list stored files under keywords folder and load...
+        # For simplicity: look for known class names
+        for cname in ["positives","negatives"]:
+            try:
+                kb = supabase.storage.from_(KEYWORD_BUCKET).download(f"{cname}.txt")
+                if kb:
+                    words = kb.decode("utf-8").splitlines()
+                    keyword_map[cname] = words
+            except Exception as e:
+                print(f"Error loading default keywords: {e}")
+                continue
 
         if not keyword_map: 
             raise RuntimeError("No keywords provided for naive classification")
