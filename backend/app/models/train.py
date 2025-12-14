@@ -16,7 +16,7 @@ class NaiveBayesParams(BaseModel):
     feature_rep: FeatureRep = "frequency"
     vocabulary: Optional[List[str]] = None
 
-AlgorithmName = Literal["knn", "naive_bayes"]
+AlgorithmName = Literal["knn", "naive_bayes", "naive_automatic", "decision_tree"]
 
 class TrainModelRequest(BaseModel):
     dataset_id: str
