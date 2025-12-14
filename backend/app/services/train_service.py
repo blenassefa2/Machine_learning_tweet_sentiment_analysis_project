@@ -469,7 +469,7 @@ def run_training_job(job_id: str, model_id: str, dataset_id: str, session_id: st
             y = df.iloc[:, 0].astype(int)  # Target is in column 0
         else:
             # For cleaned/original files, use standard extraction
-        X_text, y = extract_text_and_target(df)
+            X_text, y = extract_text_and_target(df)
 
         # Split
         update_job(job_id, 30, "Splitting dataset")
