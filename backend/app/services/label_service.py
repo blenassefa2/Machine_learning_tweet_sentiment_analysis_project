@@ -273,12 +273,19 @@ def _map_clusters_to_labels(cluster_labels: np.ndarray, n_clusters: int = 3) -> 
 
 # ---- Core worker functions ----
 def _write_labeled_file_and_store(df: pd.DataFrame, dataset_id: str) -> str:
-    """Write labeled DataFrame to storage."""
+    """Write labeled DataFrame to storage. Overwrites if file exists."""
     csv_buf = io.StringIO()
     df.to_csv(csv_buf, index=False, header=False)  # No headers for consistency
     bytes_data = csv_buf.getvalue().encode("utf-8")
     path = f"labeled/{dataset_id}_labeled.csv"
-    supabase.storage.from_(DATA_BUCKET).upload(path, bytes_data, {"contentType":"text/csv"})
+    
+    # Try to remove existing file first (if exists), then upload new one
+    try:
+        supabase.storage.from_(DATA_BUCKET).remove([path])
+    except Exception:
+        pass  # File might not exist, that's fine
+    
+    supabase.storage.from_(DATA_BUCKET).upload(path, bytes_data, {"contentType": "text/csv"})
     return path
 
 def run_manual_labeling_job(job_id: str, dataset_id: str, session_id: str, annotations: List[Dict], stop_early: bool = False):

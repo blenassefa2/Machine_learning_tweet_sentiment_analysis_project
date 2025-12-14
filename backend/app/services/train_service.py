@@ -175,7 +175,7 @@ def load_sentiment_wordlists():
     
     try:
         pos_raw = supabase.storage.from_(KEYWORD_BUCKET).download("positives.txt")
-        text = pos_raw.decode("latin-1")  # Use latin-1 to handle any encoding
+        text = pos_raw.decode("utf-8")  # Use latin-1 to handle any encoding
         positive = set([word.strip().lower() for word in text.split(',') if word.strip()])
     except Exception as e:
         print(f"Error loading positives.txt: {e}")
@@ -281,27 +281,29 @@ def run_training_job(job_id: str, model_id: str, dataset_id: str, session_id: st
             raise RuntimeError("Dataset not found.")
         ds = ds[0]
 
-        # Determine which file to use: labeled_file > cleaned_file (if has target) > original_file
+        # Debug: log what files are available
+        print(f"[TRAIN] Dataset record: labeled_file={ds.get('labeled_file')}, cleaned_file={ds.get('cleaned_file')}, original_file={ds.get('original_file')}")
+
+        # Determine which file to use: labeled_file > cleaned_file > original_file
+        # Priority: labeled file (has target), then cleaned, then original
         file_to_use = None
         file_source = None
         
+        # First priority: labeled file (always has target column)
         if ds.get("labeled_file"):
             file_to_use = ds["labeled_file"]
             file_source = "labeled"
+            print(f"[TRAIN] Using labeled file: {file_to_use}")
+        # Second priority: cleaned file
         elif ds.get("cleaned_file"):
-            # Check if cleaned file has target column
-            try:
-                test_df = load_csv_from_storage(ds["cleaned_file"])
-                # Check if it has target column (either as column name or column 0)
-                if "target" in test_df.columns or (len(test_df.columns) > 0 and test_df.iloc[:, 0].dtype in [int, float]):
-                    file_to_use = ds["cleaned_file"]
-                    file_source = "cleaned"
-            except Exception:
-                pass
-        
-        if not file_to_use:
+            file_to_use = ds["cleaned_file"]
+            file_source = "cleaned"
+            print(f"[TRAIN] Using cleaned file: {file_to_use}")
+        # Last resort: original file
+        else:
             file_to_use = ds.get("original_file")
             file_source = "original"
+            print(f"[TRAIN] Using original file: {file_to_use}")
         
         if not file_to_use:
             raise RuntimeError("No dataset file available for training.")
