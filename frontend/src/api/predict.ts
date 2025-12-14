@@ -1,70 +1,42 @@
-// src/api/predict.ts
-import axios from "axios";
+import axios from 'axios';
 
-const API_BASE = "https://machine-learning-tweet-sentiment.onrender.com/predict";
+const API_BASE = 'https://machine-learning-tweet-sentiment.onrender.com';
 
-// -------------------------------
-// Types
-// -------------------------------
-export interface PredictSingleResponse {
-  prediction: string | number;
+export interface PredictionResult {
+  tweet: string;
+  predicted_label: number;
 }
 
-export interface PredictManyResponse {
-  predictions: (string | number)[];
+export interface PredictionMetrics {
+  accuracy: number;
+  precision: number;
+  recall: number;
+  f1: number;
+  confusion_matrix: number[][];
+  error_rate: number;
 }
 
-export interface PredictDatasetResponse {
-  predictions: (string | number)[];
+export interface PredictResponse {
+  predictions: PredictionResult[];
+  total_rows: number;
+  label_distribution: {
+    '0': number;
+    '2': number;
+    '4': number;
+  };
+  algorithm: string;
+  model_name: string;
+  metrics?: PredictionMetrics | null;
+  metrics_error?: string;
 }
 
-// -------------------------------
-// Predict a Single Text
-// -------------------------------
-export const predictOne = async (
-  modelId: string,
-  sessionId: string,
-  inputText: string
-): Promise<PredictSingleResponse> => {
-  const res = await axios.post(`${API_BASE}/one`, {
-    model_id: modelId,
-    session_id: sessionId,
-    input_text: inputText,
-  });
-
-  return res.data;
-};
-
-// -------------------------------
-// Predict Many Texts
-// -------------------------------
-export const predictMany = async (
-  modelId: string,
-  sessionId: string,
-  texts: string[]
-): Promise<PredictManyResponse> => {
-  const res = await axios.post(`${API_BASE}/many`, {
-    model_id: modelId,
-    session_id: sessionId,
-    texts: texts,
-  });
-
-  return res.data;
-};
-
-// -------------------------------
-// Predict Entire Dataset
-// -------------------------------
 export const predictDataset = async (
-  modelId: string,
-  sessionId: string,
-  datasetId: string
-): Promise<PredictDatasetResponse> => {
-  const res = await axios.post(`${API_BASE}/dataset`, {
-    model_id: modelId,
-    session_id: sessionId,
+  datasetId: string,
+  sessionId: string
+): Promise<PredictResponse> => {
+  const res = await axios.post(`${API_BASE}/predict/dataset`, {
     dataset_id: datasetId,
+    session_id: sessionId,
   });
-
   return res.data;
 };

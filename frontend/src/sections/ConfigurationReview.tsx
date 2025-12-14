@@ -11,9 +11,11 @@ import ProcessConfigurations from '../components/ProcessConfigurations';
 import DataReview from '../components/DataReview';
 import ProgressModal from '../components/ProgressModal';
 import EvaluationModal from '../components/EvaluationModal';
+import PredictionModal from '../components/PredictionModal';
 import type { TextCleaningState, ColumnValidationState } from '../components/DataCleaningConfig';
 import type { LabelingParams } from '../components/LabelingConfig';
 import type { EvaluationResponse } from '../api/evaluate';
+import type { PredictResponse } from '../api/predict';
 
 const fadeInUp = keyframes`
   from {
@@ -94,6 +96,10 @@ const ConfigurationReview = () => {
   const [evaluationModalOpen, setEvaluationModalOpen] = useState(false);
   const [evaluationData, setEvaluationData] = useState<EvaluationResponse | null>(null);
 
+  // Prediction Modal State
+  const [predictionModalOpen, setPredictionModalOpen] = useState(false);
+  const [predictionData, setPredictionData] = useState<PredictResponse | null>(null);
+
   const handleJobStart = (jobId: string, jobType: 'cleaning' | 'labeling' | 'training') => {
     setCurrentJobId(jobId);
     setCurrentJobType(jobType);
@@ -108,6 +114,16 @@ const ConfigurationReview = () => {
   const handleCloseEvaluationModal = () => {
     setEvaluationModalOpen(false);
     setEvaluationData(null);
+  };
+
+  const handlePredict = (prediction: PredictResponse) => {
+    setPredictionData(prediction);
+    setPredictionModalOpen(true);
+  };
+
+  const handleClosePredictionModal = () => {
+    setPredictionModalOpen(false);
+    setPredictionData(null);
   };
 
   const handleJobComplete = () => {
@@ -187,6 +203,7 @@ const ConfigurationReview = () => {
         <DataReview
           onJobStart={handleJobStart}
           onEvaluate={handleEvaluate}
+          onPredict={handlePredict}
           cleaningConfig={{
             cleaningOption,
             missingValueStrategy,
@@ -224,6 +241,13 @@ const ConfigurationReview = () => {
         open={evaluationModalOpen}
         evaluation={evaluationData}
         onClose={handleCloseEvaluationModal}
+      />
+
+      {/* Prediction Modal */}
+      <PredictionModal
+        open={predictionModalOpen}
+        prediction={predictionData}
+        onClose={handleClosePredictionModal}
       />
     </Box>
   );

@@ -23,6 +23,8 @@ import { cleanDataset } from '../api/cleaning';
 import { labelNaive, labelClustering, labelManual } from '../api/label';
 import { trainModel } from '../api/training';
 import { evaluateDataset } from '../api/evaluate';
+import { predictDataset } from '../api/predict';
+import type { PredictResponse } from '../api/predict';
 import ManualLabelingModal from './ManualLabelingModal';
 import type { CleaningOptions, MissingValueOption, ColumnValidationOptions } from '../api/cleaning';
 import type { TextCleaningState, ColumnValidationState } from './DataCleaningConfig';
@@ -52,6 +54,7 @@ interface Dataset {
 interface DataReviewProps {
   onJobStart: (jobId: string, jobType: 'cleaning' | 'labeling' | 'training') => void;
   onEvaluate: (evaluation: any) => void;
+  onPredict: (prediction: PredictResponse) => void;
   cleaningConfig?: {
     cleaningOption: string;
     missingValueStrategy: string;
@@ -79,6 +82,7 @@ interface DataReviewProps {
 const DataReview = ({
   onJobStart,
   onEvaluate,
+  onPredict,
   cleaningConfig,
   labelingConfig,
   trainingConfig,
@@ -348,6 +352,19 @@ const DataReview = ({
     }
   };
 
+  const handlePredict = async (datasetId: string) => {
+    if (!sessionId) return;
+
+    try {
+      const prediction = await predictDataset(datasetId, sessionId);
+      onPredict(prediction);
+    } catch (error: any) {
+      console.error('Error predicting:', error);
+      const message = error.response?.data?.detail || 'Prediction failed.';
+      alert(message);
+    }
+  };
+
   const formatDate = (dateString?: string) => {
     if (!dateString) return 'Unknown date';
     try {
@@ -574,6 +591,23 @@ const DataReview = ({
                     >
                       Evaluate
                     </Button>
+                    <Tooltip title="Predict using trained model">
+                      <Button
+                        variant="contained"
+                        size="small"
+                        onClick={() => handlePredict(dataset.dataset_id)}
+                        sx={{
+                          backgroundColor: '#ff9800',
+                          color: '#fff',
+                          textTransform: 'none',
+                          '&:hover': {
+                            backgroundColor: '#f57c00',
+                          },
+                        }}
+                      >
+                        Predict
+                      </Button>
+                    </Tooltip>
                   </Box>
                 </ListItem>
                 {index < datasets.length - 1 && (

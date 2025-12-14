@@ -1,303 +1,312 @@
 # ML Pipeline Studio - Frontend Application
 
-A modern, responsive single-page web application built with React, TypeScript, Material-UI, and Vite. This application provides an intuitive interface for managing Machine Learning data pipelines, including data upload, cleaning, classification, model training, and prediction capabilities.
-
-## Table of Contents
-
-- [Project Overview](#project-overview)
-- [Technology Stack](#technology-stack)
-- [Features](#features)
-- [Project Structure](#project-structure)
-- [Component Documentation](#component-documentation)
-- [Styling & Theming](#styling--theming)
-- [Animations](#animations)
-- [Responsive Design](#responsive-design)
-- [Getting Started](#getting-started)
-- [Development](#development)
-
-## Project Overview
-
-ML Pipeline Studio is a comprehensive frontend application designed to streamline the machine learning workflow. The application features:
-
-- **Single-page application** with multiple sections
-- **Full-screen hero section** with visual pipeline representation
-- **Interactive configuration panels** for pipeline customization
-- **File upload functionality** with drag-and-drop support
-- **Continuous background animations** for enhanced user experience
-- **Fully responsive design** for all device sizes
+A modern, responsive single-page web application for tweet sentiment analysis. Built with React, TypeScript, and Material-UI, providing an intuitive interface for the complete ML pipeline: data upload, cleaning, labeling, training, and evaluation.
 
 ## Technology Stack
 
-- **React 19.1.1** - UI library
+- **React 19.1.1** - UI library with hooks
 - **TypeScript 5.9.3** - Type-safe JavaScript
-- **Material-UI (MUI) 7.x** - Component library and design system
+- **Material-UI (MUI) 7.x** - Component library (Grid v2 syntax)
 - **Vite 7.x** - Build tool and development server
-- **Emotion** - CSS-in-JS styling
-- **React DOM 19.1.1** - React rendering
+- **Emotion** - CSS-in-JS styling with keyframe animations
+- **Axios** - HTTP client for API communication
+- **Vercel** - Frontend deployment platform
 
 ## Features
 
-### 1. Navigation Bar
-- **Brain icon logo** (Psychology icon from MUI)
-- Navigation links: Documentation, Models, Support
-- Responsive design (links hidden on mobile)
-- "Start" call-to-action button
-- Smooth slide-down animation on load
-- Interactive hover effects with color transitions and transforms
+### Core Functionality
+- **File Upload**: Drag-and-drop CSV upload with 2MB size limit
+- **Data Cleaning**: Remove duplicates, handle missing values, text preprocessing
+- **Labeling**: Manual annotation, naive keyword-based, clustering-based
+- **Model Training**: KNN, Naive Bayes, Naive Automatic algorithms
+- **Evaluation**: Visual metrics display with confusion matrix
+- **Progress Tracking**: Real-time job progress with polling
 
-### 2. Hero Section
-- **Full viewport height** (100vh) design
-- Main title: "Complete ML Data Pipeline"
-- Descriptive subtitle text
-- **Horizontal pipeline visualization** showing:
-  - Clean → Classify → Evaluate → Learn → Predict
-  - **Classify rectangle** containing Manual/Auto options (no separate circle)
-  - Manual and Auto classification methods displayed as circles inside the rectangle
-  - Flow arrows connecting each step
-- Staggered fade-in and slide-in animations
-- Hover effects on pipeline elements
+### UI/UX Features
+- **Session-based**: Anonymous sessions persisted via localStorage
+- **Dark theme** with blue accent colors (`#646cff`)
+- **Smooth animations**: Fade-in, slide-up, hover effects
+- **Responsive design**: Mobile and desktop layouts
+- **Background animations**: Bouncing balls, flowing lines, floating particles
 
-### 3. File Upload Section
-- Drag-and-drop file upload area
-- Click-to-browse functionality
-- Visual feedback during drag operations
-- Supported formats: PDF, DOC, DOCX, JPG, PNG, MP4 (Max 100MB)
-- Smooth animations on load
-- Hover lift effect on upload box
+---
 
-### 4. Configuration & Review Section
+## Technical Explanations
 
-#### Pipeline Configuration Panel (3 columns):
+### Pipeline Configuration System
 
-**a) Data Cleaning:**
-- Radio button options:
-  - Remove Duplicates
-  - Handle Missing Values (with strategy selector: Mean, Median, Mode, Drop Rows)
+The application uses a **three-panel configuration system** that maps user choices to backend API parameters:
 
-**b) Labeling:**
-- 
+#### 1. Data Cleaning Configuration
 
-**c) Model Training:**
-- 
-
-**Advanced Configuration Accordion:**
-- 
-
-#### Recent Uploads Panel:
-- List of uploaded files with metadata (name, date, size)
-- Action buttons: Clean, Classify, Train, Process
-- Responsive button layout
-
-### 5. Footer
-- Copyright information
-- Social media icons (GitHub, Twitter, LinkedIn)
-- Responsive layout (column on mobile, row on desktop)
-- Smooth hover animations on icons
-
-## Project Structure
-
-```
-frontend/
-├── src/
-│   ├── components/
-│   │   ├── Navbar.tsx          # Top navigation bar with logo and links
-│   │   ├── Footer.tsx          # Bottom footer with copyright and social links
-│   │   └── BackgroundAnimation.tsx  # Continuous background animations
-│   ├── sections/
-│   │   ├── Hero.tsx            # Hero section with pipeline visualization
-│   │   ├── FileUpload.tsx      # File upload section with drag-and-drop
-│   │   └── ConfigurationReview.tsx  # Configuration and recent uploads
-│   ├── App.tsx                 # Main application component
-│   ├── App.css                 # Global application styles
-│   ├── index.css               # Base styles and theme variables
-│   └── main.tsx                # Application entry point
-├── public/
-├── package.json
-├── tsconfig.json
-├── vite.config.ts
-└── Readme.md
+```typescript
+interface CleaningOptions {
+  remove_duplicates?: boolean;
+  missing_value_options?: MissingValueOption[];
+  keep_columns?: { index: number; name: string }[];
+  text_cleaning?: TextCleaningOptions;
+  column_validations?: ColumnValidationOptions[];
+}
 ```
 
-## Component Documentation
+**Key feature - Column Mapping:**
+Users specify which columns to keep using format: `"0:target, 5:tweet"`
+- Parsed into structured format: `[{ index: 0, name: "target" }, { index: 5, name: "tweet" }]`
+- Allowed names: `tweet`, `id`, `date`, `target`, `username`, `topic`
+- Enables handling of non-standard CSV structures
 
-### BackgroundAnimation Component
+**Text cleaning options:**
+- Remove URLs, retweets, hashtags, mentions
+- Remove HTML tags, extra spaces
+- Remove contradictory emojis
+- Language filtering (English/French only)
 
-**Purpose:** Provides continuous, subtle background animations throughout the entire application.
+#### 2. Labeling Configuration
 
-**Features:**
-- **6 Bouncing Balls**: Different sizes (12-18px), varying bounce patterns
-  - Animation durations: 15-25 seconds
-  - Multiple bounce patterns (bounce, bounceSlow, bounceReverse)
-  - Positioned across the viewport at different percentages
-- **5 Flowing Lines**: Vertical lines moving from top to bottom
-  - Animation durations: 12-20 seconds
-  - Gradient opacity for smooth appearance/disappearance
-  - Positioned at 15%, 35%, 55%, 75%, and 90% width
-- **5 Floating Particles**: Small particles with rotation and floating motion
-  - Animation durations: 8-12 seconds with staggered delays
-  - Opacity changes for subtle effect
-
-**Technical Details:**
-- Fixed positioning (`position: fixed`)
-- Z-index: 0 (behind all content)
-- Pointer events disabled (`pointerEvents: 'none'`)
-- Uses CSS keyframes for animations
-- Color: `#646cff40` (blue with 25% opacity)
-
-
-## Styling & Theming
-
-### Color Scheme
-- **Primary Color**: `#646cff` (Blue)
-- **Primary Dark**: `#5058e6` (Darker blue for borders/hovers)
-- **Background**: `#1a1a1a` (Dark)
-- **Border Color**: `#333` (Dark gray)
-- **Text Colors**: 
-  - White (`#fff`) for primary text
-  - Light gray (`#ccc`) for secondary text
-  - Dark gray (`#999`) for tertiary text
-
-### Material-UI Theme
-- Dark mode enabled
-- Custom primary color set to blue (`#646cff`)
-- Dark background colors for papers and containers
-
-### CSS-in-JS
-- All styles use Material-UI's `sx` prop with Emotion
-- Consistent spacing and typography scale
-- Responsive breakpoints using MUI theme
-
-## Animations
-
-### Initial Load Animations
-
-1. **Navbar:**
-   - Slide-down animation (0.6s)
-
-2. **Hero Section:**
-   - Fade-in for container (0.6s)
-   - Fade-in-up for title (0.8s)
-   - Fade-in-up for description (1s with 0.2s delay)
-   - Staggered slide-in-left for pipeline elements (0.6s - 1.8s)
-   - Fade-in for arrows (0.8s - 1.8s)
-
-3. **File Upload:**
-   - Fade-in-up for title (0.8s)
-   - Staggered animations for description and upload box (0.2s - 1s delays)
-
-4. **Configuration Section:**
-   - Fade-in-up for title (0.8s)
-   - Staggered fade-in-up for cards (0.2s, 0.4s, 0.6s)
-   - Fade-in-up for Recent Uploads (0.8s)
-
-5. **Footer:**
-   - Fade-in-up animation (0.8s)
-
-### Hover Animations
-
-- **Pipeline Circles**: Scale up (1.1x) on hover
-- **Buttons**: Scale, lift, or color change effects
-- **Configuration Cards**: Lift (translateY -5px) with glow shadow
-- **Navbar Links**: Color change to primary color + lift
-- **Social Icons**: Lift and scale on hover
-- **Upload Box**: Lift with shadow on hover
-- **Classify Rectangle**: Lift without color change (border remains same)
-
-### Continuous Animations
-
-- **Background Balls**: Continuous bouncing patterns
-- **Flowing Lines**: Continuous top-to-bottom flow
-- **Floating Particles**: Continuous floating and rotation
-
-All animations use CSS keyframes with `ease-out` or `linear` timing functions for smooth, natural motion.
-
-## Responsive Design
-
-### Breakpoints
-- **Mobile**: `< 768px` (md breakpoint)
-- **Desktop**: `≥ 768px`
-
-
-
-## Getting Started
-
-### Prerequisites
-- Node.js (v20.14.0 or higher recommended)
-- npm (v10.7.0 or higher)
-
-### Installation
-
-1. Navigate to the frontend directory:
-```bash
-cd frontend
+```typescript
+interface LabelingParams {
+  clusteringAlgorithm: string;  // "kmeans" | "hierarchical"
+  nClusters: number;
+  linkage: string;              // "average" | "complete" | "ward"
+  eps: number;                  // DBSCAN only
+  minSamples: number;           // DBSCAN only
+  useDefaultKeywords: boolean;
+}
 ```
 
-2. Install dependencies:
-```bash
-npm install
+**Three labeling methods:**
+
+| Method | Description | UI Workflow |
+|--------|-------------|-------------|
+| **Manual** | Opens modal for row-by-row annotation | User labels each tweet (0/2/4), can navigate back |
+| **Naive** | Keyword-based automatic labeling | Uses backend keyword files |
+| **Clustering** | Groups tweets by text similarity | Configurable algorithm and parameters |
+
+**Manual Labeling Modal:**
+- Fetches entire dataset to frontend
+- Displays one row at a time with navigation
+- Quick label buttons: Negative (0), Neutral (2), Positive (4)
+- Real-time progress bar and label distribution stats
+- "Stop & Save" for partial labeling
+
+#### 3. Training Configuration
+
+```typescript
+interface TrainingConfig {
+  learningModel: string;        // "knn" | "naive_bayes" | "naive_automatic"
+  testSplit: number;            // 10-40%
+  kValue: number;               // KNN: number of neighbors
+  ngram: string;                // Naive Bayes: "unigram" | "bigram" | "trigram"
+  featureRep: string;           // Naive Bayes: "count" | "binary"
+}
 ```
 
-This will install all required packages including:
-- React and React DOM
-- Material-UI and icons
-- TypeScript and related tools
-- Vite build tool
+**Algorithm-specific parameters dynamically shown:**
+- **KNN**: K slider (1-15) with Jaccard distance explanation
+- **Naive Bayes**: N-gram dropdown + Feature representation dropdown
+- **Naive Automatic**: Info box explaining keyword-based classification
 
-### Running the Development Server
+### State Management Flow
 
-```bash
-npm run dev
+```
+ConfigurationReview.tsx (parent)
+├── ProcessConfigurations.tsx
+│   ├── DataCleaningConfig.tsx   → cleaningConfig state
+│   ├── LabelingConfig.tsx       → labelingParams state
+│   └── TrainingConfig.tsx       → trainingConfig state
+└── DataReview.tsx
+    ├── handleClean()  → builds CleaningOptions from cleaningConfig
+    ├── handleLabel()  → builds request from labelingParams
+    └── handleTrain()  → builds hyperparameters from trainingConfig
 ```
 
-The application will be available at `http://localhost:5173` (or the next available port).
+### API Communication Pattern
 
-### Building for Production
+```typescript
+// Example: Training request
+const hyperparameters: Record<string, any> = {};
 
-```bash
-npm run build
+if (algorithm === 'knn') {
+  hyperparameters.k = trainingConfig.kValue;
+} else if (algorithm === 'naive_bayes') {
+  hyperparameters.ngram = trainingConfig.ngram;
+  hyperparameters.feature_rep = trainingConfig.featureRep;
+}
+
+await trainModel({
+  dataset_id, session_id, algorithm, hyperparameters,
+  test_size: trainingConfig.testSplit / 100
+});
 ```
 
-The production build will be generated in the `dist/` directory.
+### Progress Modal System
 
-### Preview Production Build
+Unified modal for all job types (cleaning, labeling, training):
+- **Polling mechanism**: Checks job status every 2 seconds
+- **Status states**: `pending` → `queued` → `running` → `completed` | `failed`
+- **Visual feedback**: Progress bar, status text, preview on completion
+- **Labeling summary**: Graphical distribution bar with sentiment counts
 
-```bash
-npm run preview
+---
+
+## Technical Difficulties Faced
+
+### 1. Clustering Results Confusion
+
+**Problem:** When using Average and Complete linkage for clustering, almost all tweets ended up in a single cluster, making me think the algorithm was broken.
+
+**Investigation:** Tested with multiple datasets - same behavior. Researched hierarchical clustering deeply.
+
+**Understanding gained:** Clustering measures **word similarity (Jaccard distance)**, not sentiment. Tweets with similar vocabulary cluster together regardless of meaning. Average/Complete linkage are sensitive to small distance differences.
+
+**Mitigation:** 
+- Added Ward linkage option (produces more balanced clusters)
+- Added info tooltips explaining each algorithm's behavior
+- Accepted that clustering is not ideal for sentiment analysis
+
+### 2. File Encoding Issues
+
+**Problem:** Non-UTF-8 encoded CSV files caused backend decode errors, breaking the entire upload flow.
+
+**Initial attempts:** Tried implementing client-side encoding detection using FileReader, but JavaScript's binary handling made this unreliable.
+
+**Mitigation:** 
+- Added frontend validation message: "Please ensure UTF-8 encoding"
+- Backend implements multi-encoding fallback
+- Clear error messages when encoding fails
+
+### 3. Dynamic Dataset Column Detection
+
+**Problem:** Users upload datasets with varying structures - different column orders, names, and even no headers. Target column might be called "polarity", "sentiment", "label", or just be column index 0.
+
+**Mitigation:** 
+Created **Keep Columns configuration**:
+```
+User input: "0:target, 5:tweet"
+↓
+Parsed to: [{ index: 0, name: "target" }, { index: 5, name: "tweet" }]
+```
+- Dropdown for allowed column types
+- Validation against allowed names
+- Backend uses this mapping to standardize processing
+
+### 4. Large File Upload Limits
+
+**Problem:** Files over 250MB crashed the free-tier Render backend due to memory limits.
+
+**Mitigation:**
+- Frontend enforces **2MB maximum** file size
+- Clear error message: "File too large. Maximum size is 2MB."
+- Disabled upload button during processing to prevent duplicate uploads
+
+### 5. MUI Grid v2 Syntax Migration
+
+**Problem:** TypeScript errors with MUI Grid component:
+```
+Property 'item' does not exist on type...
 ```
 
-## Development
+**Cause:** MUI v6+ uses new Grid syntax without `item` prop.
 
-### Key Development Features
+**Mitigation:** Changed from:
+```tsx
+<Grid item xs={6} sm={3}>  // Old v5 syntax
+```
+to:
+```tsx
+<Grid size={{ xs: 6, sm: 3 }}>  // New v6 syntax
+```
 
-- **Hot Module Replacement (HMR)**: Instant updates during development
-- **TypeScript**: Full type checking for type safety
-- **ESLint**: Code quality and consistency checks
-- **Fast Refresh**: React component state preservation during development
+### 6. File Input Reset Issue
 
-### Code Style
+**Problem:** After uploading a file, selecting the same file again didn't trigger the upload.
 
-- Functional components with hooks
-- TypeScript for type safety
-- Material-UI `sx` prop for styling
-- Consistent component structure
-- Descriptive variable and function names
+**Cause:** HTML file input doesn't fire `onChange` if the same file is selected.
 
-### File Organization
+**Mitigation:** 
+```tsx
+const fileInputRef = useRef<HTMLInputElement>(null);
 
-- Components separated by functionality
-- Sections for major page sections
-- Shared components in components directory
-- Styles co-located with components
+const resetFileInput = () => {
+  if (fileInputRef.current) {
+    fileInputRef.current.value = '';
+  }
+};
+// Call after upload completes or fails
+```
 
+### 7. Session Persistence
 
-## Notes
+**Problem:** Users lost their datasets when refreshing the page.
 
-- All animations are optimized for performance using CSS transforms and opacity
-- Background animations are non-interactive (pointer-events: none)
-- Full-height sections only apply to Hero section
-- File upload functionality is currently logged to console (backend integration pending)
-- Configuration state management uses React hooks (useState)
+**Mitigation:** Implemented `SessionContext` with localStorage:
+```tsx
+const [sessionId] = useState(() => {
+  const stored = localStorage.getItem('ml_session_id');
+  if (stored) return stored;
+  const newId = crypto.randomUUID();
+  localStorage.setItem('ml_session_id', newId);
+  return newId;
+});
+```
 
-## License
+### 8. API URL Configuration
 
-This project is part of the ML Pipeline Studio application suite.
+**Problem:** `getLabelingResult()` was returning HTML instead of JSON - hitting the frontend dev server instead of backend.
+
+**Cause:** Missing `API_BASE` prefix in axios call.
+
+**Mitigation:** Ensured all API calls use the configured base URL:
+```typescript
+const API_BASE = "https://machine-learning-tweet-sentiment.onrender.com/datasets";
+axios.get(`${API_BASE}/${datasetId}/labeling`, { params: { session_id } });
+```
+
+---
+
+## Results and Observations
+
+### Algorithm Performance
+
+| Algorithm | Best Settings | Why |
+|-----------|---------------|-----|
+| **Naive Bayes** | Bigram + Binary | Captures word pairs ("not good"), presence-only reduces noise from word frequency |
+| **KNN** | K = 7-11 | More neighbors = more stable voting; too high K loses local patterns |
+| **Naive Automatic** | Domain-specific keywords | Directly depends on keyword list quality |
+
+### Key Observations
+
+1. **Naive Bayes with bigram + binary features slightly outperforms other configurations** - Word pairs capture negation and context better than single words.
+
+2. **KNN performance increases with K** - Higher K values provide more robust majority voting, reducing sensitivity to outlier training examples.
+
+3. **Naive Automatic works best with comprehensive, domain-specific keyword lists** - Generic sentiment words miss domain-specific expressions.
+
+### Clustering Insights
+
+| Linkage | Behavior | Suitability for Sentiment |
+|---------|----------|---------------------------|
+| **Average** | Creates one dominant cluster | Poor - ignores subtle differences |
+| **Complete** | Creates one dominant cluster | Poor - outlier sensitive |
+| **Ward** | More balanced distribution | Better visualization, but still measures word overlap not sentiment |
+
+**Critical insight:** Clustering fundamentally cannot solve sentiment analysis because:
+- **Jaccard distance measures lexical overlap**, not semantic meaning
+- "I love this movie" and "I hate this movie" have high similarity
+- Clustering groups by vocabulary, not by sentiment polarity
+
+---
+
+## Conclusion
+
+This frontend demonstrates a complete ML pipeline interface with:
+
+1. **Flexible configuration** - Users can customize every step from cleaning to training
+2. **Visual feedback** - Progress modals, graphical metrics, and confusion matrix visualization
+3. **Robust error handling** - Clear messages for encoding, file size, and API errors
+4. **Type safety** - Full TypeScript coverage for reliable development
+
+**Key learnings:**
+- Data preprocessing (encoding, column mapping) is as important as the ML algorithms
+- Clustering algorithms are not suitable for sentiment analysis due to measuring syntactic rather than semantic similarity
+- Supervised methods (KNN, Naive Bayes) with proper parameter tuning provide the best results for text classification
