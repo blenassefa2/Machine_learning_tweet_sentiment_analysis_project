@@ -505,7 +505,7 @@ def run_cleaning_job(job_id: str, dataset_id: str, session_id: str, options: Cle
         
         # Decode with graceful fallback
         text = None
-        encodings_to_try = [encoding, "utf-8", "latin-1", "iso-8859-1", "cp1252", "windows-1252"]
+        encodings_to_try = ["utf-8", "latin-1", "iso-8859-1", "cp1252", "windows-1252"]
         
         for enc in encodings_to_try:
             try:
