@@ -33,7 +33,7 @@ interface ProgressModalProps {
 
 const ProgressModal = ({ open, jobId, jobType, onClose, onComplete }: ProgressModalProps) => {
   const { sessionId } = useSession();
-  const [status, setStatus] = useState<'pending' | 'running' | 'completed' | 'error'>('pending');
+  const [status, setStatus] = useState<'pending' | 'queued' | 'running' | 'completed' | 'error' | 'failed'>('pending');
   const [progress, setProgress] = useState<number>(0);
   const [message, setMessage] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState<string>('');
@@ -86,7 +86,7 @@ const ProgressModal = ({ open, jobId, jobType, onClose, onComplete }: ProgressMo
         }
         
         if (response.logs) setErrorMessage(response.logs);
-        if (response.status === 'error' && cleaningResponse.message) {
+        if ((response.status === 'error' || response.status === 'failed') && cleaningResponse.message) {
           setErrorMessage(cleaningResponse.message);
         }
 
@@ -105,7 +105,7 @@ const ProgressModal = ({ open, jobId, jobType, onClose, onComplete }: ProgressMo
           }
           
           if (onComplete) onComplete();
-        } else if (response.status === 'error') {
+        } else if (response.status === 'error' || response.status === 'failed') {
           if (interval) clearInterval(interval);
         }
       } catch (err: any) {
@@ -156,12 +156,14 @@ const ProgressModal = ({ open, jobId, jobType, onClose, onComplete }: ProgressMo
   const getStatusText = () => {
     switch (status) {
       case 'pending':
+      case 'queued':
         return 'Job queued...';
       case 'running':
         return 'Processing...';
       case 'completed':
         return 'Completed successfully!';
       case 'error':
+      case 'failed':
         return 'Error occurred';
       default:
         return 'Unknown status';
@@ -171,9 +173,9 @@ const ProgressModal = ({ open, jobId, jobType, onClose, onComplete }: ProgressMo
   const primaryColor = '#646cff';
 
   return (
-    <Dialog
+      <Dialog
       open={open}
-      onClose={status === 'completed' || status === 'error' ? onClose : undefined}
+      onClose={status === 'completed' || status === 'error' || status === 'failed' ? onClose : undefined}
       maxWidth="sm"
       fullWidth
       PaperProps={{
@@ -190,7 +192,7 @@ const ProgressModal = ({ open, jobId, jobType, onClose, onComplete }: ProgressMo
       </DialogTitle>
       <DialogContent>
         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, py: 2 }}>
-          {status === 'pending' || status === 'running' ? (
+          {status === 'pending' || status === 'queued' || status === 'running' ? (
             <>
               <CircularProgress sx={{ color: primaryColor }} />
               <Typography sx={{ color: '#ccc' }}>{getStatusText()}</Typography>
@@ -305,7 +307,7 @@ const ProgressModal = ({ open, jobId, jobType, onClose, onComplete }: ProgressMo
             },
           }}
         >
-          {status === 'completed' || status === 'error' ? 'Close' : 'Cancel'}
+          {status === 'completed' || status === 'error' || status === 'failed' ? 'Close' : 'Cancel'}
         </Button>
       </DialogActions>
     </Dialog>

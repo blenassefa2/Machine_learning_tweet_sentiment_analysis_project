@@ -22,6 +22,7 @@ import { listDatasets } from '../api/datasets';
 import { cleanDataset } from '../api/cleaning';
 import { labelNaive, labelClustering, labelManual } from '../api/label';
 import { trainModel } from '../api/training';
+import { evaluateDataset } from '../api/evaluate';
 import ManualLabelingModal from './ManualLabelingModal';
 import type { CleaningOptions, MissingValueOption, ColumnValidationOptions } from '../api/cleaning';
 import type { TextCleaningState, ColumnValidationState } from './DataCleaningConfig';
@@ -44,10 +45,13 @@ interface Dataset {
   uploaded_at?: string;
   size?: string;
   status?: string;
+  cleaned_file?: string;
+  labeled_file?: string;
 }
 
 interface DataReviewProps {
   onJobStart: (jobId: string, jobType: 'cleaning' | 'labeling' | 'training') => void;
+  onEvaluate: (evaluation: any) => void;
   cleaningConfig?: {
     cleaningOption: string;
     missingValueStrategy: string;
@@ -72,6 +76,7 @@ interface DataReviewProps {
 
 const DataReview = ({
   onJobStart,
+  onEvaluate,
   cleaningConfig,
   labelingConfig,
   trainingConfig,
@@ -283,20 +288,10 @@ const DataReview = ({
   };
 
   const handleTrain = async (datasetId: string) => {
-    if (!trainingConfig || !sessionId) return;
+    if (!trainingConfig || !sessionId || !trainingConfig.learningModel) return;
 
     try {
-      // Map frontend classifier names to backend algorithm names
-      const algorithmMap: Record<string, string> = {
-        'naive-bayes': 'naive_bayes',
-        'svm': 'svm',
-        'random-forest': 'random_forest',
-        'knn': 'knn',
-      };
-
-      // For training, we still need classifier info from labeling config if available
-      // This is a temporary bridge - in the future training will use labeled datasets
-      const algorithm = 'naive_bayes'; // Default algorithm
+      const algorithm = trainingConfig.learningModel; // Already matches backend format
       const hyperparameters: Record<string, any> = {};
 
       const result = await trainModel({
@@ -312,14 +307,20 @@ const DataReview = ({
     }
   };
 
-  const handleProcess = async (datasetId: string) => {
-    // Process = Clean -> Label -> Train in sequence
+  const handleEvaluate = async (datasetId: string) => {
+    if (!sessionId) return;
+
     try {
-      await handleClean(datasetId);
-      // Note: In a real implementation, you'd wait for cleaning to complete
-      // before starting labeling, and so on. This is a simplified version.
-    } catch (error) {
-      console.error('Error processing dataset:', error);
+      const evaluation = await evaluateDataset(datasetId, sessionId);
+      onEvaluate(evaluation);
+    } catch (error: any) {
+      console.error('Error fetching evaluation:', error);
+      // Show error message to user
+      if (error.response?.status === 404) {
+        alert('No trained model found for this dataset. Please train a model first.');
+      } else {
+        alert(error.response?.data?.detail || 'Failed to get evaluation metrics.');
+      }
     }
   };
 
@@ -472,7 +473,8 @@ const DataReview = ({
                       variant="outlined"
                       size="small"
                       onClick={() => handleLabel(dataset.dataset_id)}
-                      disabled={!labelingConfig?.labelingMethod}
+                      disabled={!labelingConfig?.labelingMethod || !dataset.cleaned_file}
+                      title={!dataset.cleaned_file ? "Dataset must be cleaned before labeling" : ""}
                       sx={{
                         borderColor: primaryColor,
                         color: primaryColor,
@@ -513,22 +515,17 @@ const DataReview = ({
                     <Button
                       variant="contained"
                       size="small"
-                      onClick={() => handleProcess(dataset.dataset_id)}
-                      disabled={!cleaningConfig?.cleaningOption || !labelingConfig?.labelingMethod || !trainingConfig?.learningModel}
+                      onClick={() => handleEvaluate(dataset.dataset_id)}
                       sx={{
-                        backgroundColor: primaryColor,
+                        backgroundColor: '#4caf50',
                         color: '#fff',
                         textTransform: 'none',
                         '&:hover': {
-                          backgroundColor: primaryColorDark,
-                        },
-                        '&:disabled': {
-                          backgroundColor: '#444',
-                          color: '#666',
+                          backgroundColor: '#388e3c',
                         },
                       }}
                     >
-                      Process
+                      Evaluate
                     </Button>
                   </Box>
                 </ListItem>

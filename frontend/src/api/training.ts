@@ -20,11 +20,13 @@ export interface TrainingJob {
   dataset_id: string;
   session_id: string;
   algorithm: string;
-  status: "pending" | "running" | "completed" | "error";
+  status: "queued" | "running" | "completed" | "failed";
   model_id?: string;
   logs?: string;
   created_at?: string;
   finished_at?: string;
+  progress?: number;
+  message?: string;
 }
 
 // ----------------------------
@@ -67,7 +69,7 @@ export const waitForTrainingCompletion = async (
           resolve(job);
         }
 
-        if (job.status === "error") {
+        if (job.status === "failed") {
           clearInterval(interval);
           reject(new Error(job.logs || "Training failed."));
         }

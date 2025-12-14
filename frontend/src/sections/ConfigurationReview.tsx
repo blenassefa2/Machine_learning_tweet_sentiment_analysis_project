@@ -11,8 +11,10 @@ import ProcessConfigurations from '../components/ProcessConfigurations';
 import AdvancedSettings from '../components/AdvancedSettings';
 import DataReview from '../components/DataReview';
 import ProgressModal from '../components/ProgressModal';
+import EvaluationModal from '../components/EvaluationModal';
 import type { TextCleaningState, ColumnValidationState } from '../components/DataCleaningConfig';
 import type { LabelingParams } from '../components/LabelingConfig';
+import type { EvaluationResponse } from '../api/evaluate';
 
 const fadeInUp = keyframes`
   from {
@@ -92,10 +94,24 @@ const ConfigurationReview = () => {
   const [currentJobId, setCurrentJobId] = useState<string | null>(null);
   const [currentJobType, setCurrentJobType] = useState<'cleaning' | 'labeling' | 'training' | null>(null);
 
+  // Evaluation Modal State
+  const [evaluationModalOpen, setEvaluationModalOpen] = useState(false);
+  const [evaluationData, setEvaluationData] = useState<EvaluationResponse | null>(null);
+
   const handleJobStart = (jobId: string, jobType: 'cleaning' | 'labeling' | 'training') => {
     setCurrentJobId(jobId);
     setCurrentJobType(jobType);
     setProgressModalOpen(true);
+  };
+
+  const handleEvaluate = (evaluation: EvaluationResponse) => {
+    setEvaluationData(evaluation);
+    setEvaluationModalOpen(true);
+  };
+
+  const handleCloseEvaluationModal = () => {
+    setEvaluationModalOpen(false);
+    setEvaluationData(null);
   };
 
   const handleJobComplete = () => {
@@ -185,6 +201,7 @@ const ConfigurationReview = () => {
         {/* Recent Uploads */}
         <DataReview
           onJobStart={handleJobStart}
+          onEvaluate={handleEvaluate}
           cleaningConfig={{
             cleaningOption,
             missingValueStrategy,
@@ -215,6 +232,13 @@ const ConfigurationReview = () => {
         jobType={currentJobType}
         onClose={handleCloseProgressModal}
         onComplete={handleJobComplete}
+      />
+
+      {/* Evaluation Modal */}
+      <EvaluationModal
+        open={evaluationModalOpen}
+        evaluation={evaluationData}
+        onClose={handleCloseEvaluationModal}
       />
     </Box>
   );

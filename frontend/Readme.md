@@ -73,31 +73,15 @@ ML Pipeline Studio is a comprehensive frontend application designed to streamlin
 - Radio button options:
   - Remove Duplicates
   - Handle Missing Values (with strategy selector: Mean, Median, Mode, Drop Rows)
-  - Normalize Data (with method selector: Standard Scaler, Min-Max Scaler, Robust Scaler)
 
-**b) Classification:**
-- Classifier algorithm dropdown:
-  - Naive Bayes
-  - SVM (with kernel selection: RBF, Linear, Polynomial, and C-value slider)
-  - Random Forest (with n_estimators and max_depth sliders)
-  - K-Nearest Neighbors (with k_neighbors slider)
-- Dynamic parameter controls based on selected classifier
+**b) Labeling:**
+- 
 
 **c) Model Training:**
-- Learning model dropdown:
-  - Linear Regression
-  - Logistic Regression
-  - Decision Tree
-  - Neural Network (with epochs, learning rate, and batch size sliders)
-- Checkboxes:
-  - Cross Validation (enabled by default)
-  - Auto-tune Parameters
-- Test split slider (10-40%)
+- 
 
 **Advanced Configuration Accordion:**
-- Random State input
-- Early Stopping toggle with Patience slider
-- Collapsible accordion design
+- 
 
 #### Recent Uploads Panel:
 - List of uploaded files with metadata (name, date, size)

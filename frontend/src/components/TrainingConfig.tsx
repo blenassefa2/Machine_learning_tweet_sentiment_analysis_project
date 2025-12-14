@@ -22,12 +22,13 @@ interface TrainingConfigProps {
   setAutoTune: (value: boolean) => void;
   testSplit: number;
   setTestSplit: (value: number) => void;
-  epochs: number;
-  setEpochs: (value: number) => void;
-  learningRate: number;
-  setLearningRate: (value: number) => void;
-  batchSize: number;
-  setBatchSize: (value: number) => void;
+  // Optional props for backward compatibility (not used by current algorithms)
+  epochs?: number;
+  setEpochs?: (value: number) => void;
+  learningRate?: number;
+  setLearningRate?: (value: number) => void;
+  batchSize?: number;
+  setBatchSize?: (value: number) => void;
 }
 
 const TrainingConfig = ({
@@ -39,12 +40,6 @@ const TrainingConfig = ({
   setAutoTune,
   testSplit,
   setTestSplit,
-  epochs,
-  setEpochs,
-  learningRate,
-  setLearningRate,
-  batchSize,
-  setBatchSize,
 }: TrainingConfigProps) => {
   const primaryColor = '#646cff';
 
@@ -94,10 +89,10 @@ const TrainingConfig = ({
             },
           }}
         >
-          <MenuItem value="linear">Linear Regression</MenuItem>
-          <MenuItem value="logistic">Logistic Regression</MenuItem>
-          <MenuItem value="decision-tree">Decision Tree</MenuItem>
-          <MenuItem value="neural-network">Neural Network</MenuItem>
+          <MenuItem value="knn">K-Nearest Neighbors (KNN)</MenuItem>
+          <MenuItem value="naive_bayes">Naive Bayes</MenuItem>
+          <MenuItem value="naive_automatic">Naive Automatic</MenuItem>
+          <MenuItem value="decision_tree">Decision Tree</MenuItem>
         </Select>
       </FormControl>
       <Box sx={{ mt: 1 }}>
@@ -146,37 +141,6 @@ const TrainingConfig = ({
             step={5}
             sx={{ color: primaryColor }}
           />
-          {learningModel === 'neural-network' && (
-            <>
-              <Typography sx={{ color: '#ccc', mb: 1, mt: 2 }}>Epochs: {epochs}</Typography>
-              <Slider
-                value={epochs}
-                onChange={(_, val) => setEpochs(val as number)}
-                min={10}
-                max={500}
-                step={10}
-                sx={{ color: primaryColor }}
-              />
-              <Typography sx={{ color: '#ccc', mb: 1, mt: 2 }}>Learning Rate: {learningRate}</Typography>
-              <Slider
-                value={learningRate}
-                onChange={(_, val) => setLearningRate(val as number)}
-                min={0.0001}
-                max={0.1}
-                step={0.0001}
-                sx={{ color: primaryColor }}
-              />
-              <Typography sx={{ color: '#ccc', mb: 1, mt: 2 }}>Batch Size: {batchSize}</Typography>
-              <Slider
-                value={batchSize}
-                onChange={(_, val) => setBatchSize(val as number)}
-                min={16}
-                max={128}
-                step={16}
-                sx={{ color: primaryColor }}
-              />
-            </>
-          )}
         </Box>
       )}
     </Paper>
