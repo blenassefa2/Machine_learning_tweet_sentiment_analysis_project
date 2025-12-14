@@ -17,12 +17,6 @@ try:
 except ImportError:
     LANGDETECT_AVAILABLE = False
 
-try:
-    import chardet
-    CHARDET_AVAILABLE = True
-except ImportError:
-    CHARDET_AVAILABLE = False
-
 DATA_BUCKET = "datasets"
 JOB_TABLE = "clean_jobs"
 DATASET_TABLE = "datasets"
@@ -484,33 +478,15 @@ def run_cleaning_job(job_id: str, dataset_id: str, session_id: str, options: Cle
         if isinstance(file_bytes, dict) and file_bytes.get("error"):
             raise RuntimeError(f"Storage download error: {file_bytes}")
 
-        update_job_progress(job_id, 15, "Detecting encoding and parsing CSV")
-        
-        # Detect encoding gracefully (similar to input_output.py)
-        # Decode with graceful fallback
-       
-        text = file_bytes.decode("utf-8")
-        
+        update_job_progress(job_id, 15, "Parsing CSV")
         # Read into pandas (CSV files don't have headers, first row is data)
+        text = file_bytes.decode("utf-8")
         # Try to infer separator; default comma, no header row
-        df = None
-        separators_to_try = [',', '|', ';', '\t']
-        
-        for sep in separators_to_try:
-            try:
-                df = pd.read_csv(io.StringIO(text), header=None, sep=sep, on_bad_lines='skip', engine='python')
-                # If we got a valid DataFrame with reasonable number of columns, use it
-                if df is not None and len(df.columns) > 0:
-                    break
-            except Exception:
-                continue
-        
-        if df is None:
-            # Final fallback: try with default settings
-            try:
-                df = pd.read_csv(io.StringIO(text), header=None, on_bad_lines='skip', engine='python')
-            except Exception as e:
-                raise RuntimeError(f"Failed to parse CSV file: {e}")
+        try:
+            df = pd.read_csv(io.StringIO(text), header=None)
+        except Exception:
+            # Fallback: try with sep='|'
+            df = pd.read_csv(io.StringIO(text), sep='|', header=None)
 
         initial_row_count = len(df)
         cleaning_metrics["initial_rows"] = initial_row_count
