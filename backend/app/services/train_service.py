@@ -21,6 +21,7 @@ from app.models.train import (
 
 DATA_BUCKET = "datasets"
 MODEL_BUCKET = "models"
+KEYWORD_BUCKET = "keywords"
 MODEL_TABLE = "trained_models"
 JOB_TABLE = "training_jobs"
 DATASET_TABLE = "datasets"
@@ -39,6 +40,24 @@ def now_iso():
 
 def create_training_job(dataset_id: str, session_id: str, algorithm: str, model_id: str):
     job_id = str(uuid.uuid4())
+    
+    # First create a placeholder entry in trained_models to satisfy foreign key constraint
+    supabase.table(MODEL_TABLE).insert({
+        "model_id": model_id,
+        "model_name": f"{algorithm}_model",
+        "session_id": session_id,
+        "dataset_id": dataset_id,
+        "algorithm": algorithm,
+        "hyperparameters": {},
+        "vectorizer": {},
+        "model_file": None,
+        "train_size": 0,
+        "val_size": 0,
+        "metrics": {},
+        "created_at": now_iso()
+    }).execute()
+    
+    # Now create the training job
     supabase.table(JOB_TABLE).insert({
         "job_id": job_id,
         "model_id": model_id,
@@ -76,12 +95,22 @@ def mark_job_completed(job_id: str):
     }).eq("job_id", job_id).execute()
 
 
-def mark_job_failed(job_id: str, message: str):
+def mark_job_failed(job_id: str, message: str, model_id: str = None):
     supabase.table(JOB_TABLE).update({
         "status": "failed",
         "message": message,
         "finished_at": now_iso()
     }).eq("job_id", job_id).execute()
+    
+    # Update the trained_models entry to reflect failure
+    if model_id:
+        try:
+            supabase.table(MODEL_TABLE).update({
+                "metrics": {"error": message},
+                "updated_at": now_iso()
+            }).eq("model_id", model_id).execute()
+        except Exception:
+            pass  # Ignore cleanup errors
 
 
 # ------------------------------------------------------------
@@ -140,12 +169,27 @@ def build_tfidf_vectorizer():
 # ------------------------------------------------------------
 
 def load_sentiment_wordlists():
-    pos_raw = supabase.storage.from_("jobs").download("positives.txt").decode("utf-8")
-    neg_raw = supabase.storage.from_("jobs").download("negatives.txt").decode("utf-8")
-
-    positive = set([w.strip() for w in pos_raw.splitlines() if w.strip()])
-    negative = set([w.strip() for w in neg_raw.splitlines() if w.strip()])
-
+    """Load positive and negative word lists from keywords bucket."""
+    positive = set()
+    negative = set()
+    
+    try:
+        pos_raw = supabase.storage.from_(KEYWORD_BUCKET).download("positives.txt")
+        text = pos_raw.decode("latin-1")  # Use latin-1 to handle any encoding
+        positive = set([word.strip().lower() for word in text.split(',') if word.strip()])
+    except Exception as e:
+        print(f"Error loading positives.txt: {e}")
+    
+    try:
+        neg_raw = supabase.storage.from_(KEYWORD_BUCKET).download("negatives.txt")
+        text = neg_raw.decode("latin-1")
+        negative = set([word.strip().lower() for word in text.split(',') if word.strip()])
+    except Exception as e:
+        print(f"Error loading negatives.txt: {e}")
+    
+    if not positive and not negative:
+        raise RuntimeError("Could not load keyword files from storage. Please ensure positives.txt and negatives.txt exist in the keywords bucket.")
+    
     return positive, negative
 
 
@@ -357,25 +401,20 @@ def run_training_job(job_id: str, model_id: str, dataset_id: str, session_id: st
 
         model_path = save_model_artifact(model_id, model_artifact)
 
-        # Insert into DB
-        supabase.table(MODEL_TABLE).insert({
-            "model_id": model_id,
+        # Update the trained_models entry (already created as placeholder)
+        supabase.table(MODEL_TABLE).update({
             "model_name": model_name or f"{algorithm}_model",
-            "session_id": session_id,
-            "dataset_id": dataset_id,
-            "algorithm": algorithm,
             "hyperparameters": hyperparams,
-            "vectorizer": {},   # stored inside pickle
             "model_file": model_path,
             "train_size": len(X_train),
             "val_size": len(X_val),
             "metrics": metrics,
-            "created_at": now_iso()
-        }).execute()
+            "updated_at": now_iso()
+        }).eq("model_id", model_id).execute()
 
         update_job(job_id, 100, "Completed")
         mark_job_completed(job_id)
 
     except Exception as e:
-        mark_job_failed(job_id, str(e))
+        mark_job_failed(job_id, str(e), model_id)
         raise
