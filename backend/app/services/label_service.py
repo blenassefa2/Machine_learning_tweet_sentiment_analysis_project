@@ -381,7 +381,7 @@ def run_naive_labeling_job(job_id: str, dataset_id: str, session_id: str, keywor
                     kb = supabase.storage.from_(KEYWORD_BUCKET).download(f"{cname}.txt")
                     if kb:
                         # Decode as latin-1 (can handle any byte sequence without errors)
-                        text = kb.decode("latin-1")
+                        text = kb.decode("utf-8")
                         # Parse comma-separated values: strip, lowercase, filter empty
                         words = [word.strip().lower() for word in text.split(',') if word.strip()]
                         if words:  # Only add if we got actual words
