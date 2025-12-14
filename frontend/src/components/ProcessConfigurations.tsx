@@ -33,12 +33,14 @@ interface ProcessConfigurationsProps {
   setAutoTune: (value: boolean) => void;
   testSplit: number;
   setTestSplit: (value: number) => void;
-  epochs: number;
-  setEpochs: (value: number) => void;
-  learningRate: number;
-  setLearningRate: (value: number) => void;
-  batchSize: number;
-  setBatchSize: (value: number) => void;
+  // KNN parameters
+  kValue: number;
+  setKValue: (value: number) => void;
+  // Naive Bayes parameters
+  ngram: string;
+  setNgram: (value: string) => void;
+  featureRep: string;
+  setFeatureRep: (value: string) => void;
 }
 
 const ProcessConfigurations = (props: ProcessConfigurationsProps) => {
@@ -75,12 +77,12 @@ const ProcessConfigurations = (props: ProcessConfigurationsProps) => {
         setAutoTune={props.setAutoTune}
         testSplit={props.testSplit}
         setTestSplit={props.setTestSplit}
-        epochs={props.epochs}
-        setEpochs={props.setEpochs}
-        learningRate={props.learningRate}
-        setLearningRate={props.setLearningRate}
-        batchSize={props.batchSize}
-        setBatchSize={props.setBatchSize}
+        kValue={props.kValue}
+        setKValue={props.setKValue}
+        ngram={props.ngram}
+        setNgram={props.setNgram}
+        featureRep={props.featureRep}
+        setFeatureRep={props.setFeatureRep}
       />
     </Box>
   );

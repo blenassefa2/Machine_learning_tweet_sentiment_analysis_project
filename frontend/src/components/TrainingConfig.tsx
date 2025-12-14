@@ -22,13 +22,14 @@ interface TrainingConfigProps {
   setAutoTune: (value: boolean) => void;
   testSplit: number;
   setTestSplit: (value: number) => void;
-  // Optional props for backward compatibility (not used by current algorithms)
-  epochs?: number;
-  setEpochs?: (value: number) => void;
-  learningRate?: number;
-  setLearningRate?: (value: number) => void;
-  batchSize?: number;
-  setBatchSize?: (value: number) => void;
+  // KNN parameters
+  kValue: number;
+  setKValue: (value: number) => void;
+  // Naive Bayes parameters
+  ngram: string;
+  setNgram: (value: string) => void;
+  featureRep: string;
+  setFeatureRep: (value: string) => void;
 }
 
 const TrainingConfig = ({
@@ -40,6 +41,12 @@ const TrainingConfig = ({
   setAutoTune,
   testSplit,
   setTestSplit,
+  kValue,
+  setKValue,
+  ngram,
+  setNgram,
+  featureRep,
+  setFeatureRep,
 }: TrainingConfigProps) => {
   const primaryColor = '#646cff';
 
@@ -140,6 +147,92 @@ const TrainingConfig = ({
             step={5}
             sx={{ color: primaryColor }}
           />
+        </Box>
+      )}
+
+      {/* KNN Parameters */}
+      {learningModel === 'knn' && (
+        <Box sx={{ mt: 2 }}>
+          <Typography sx={{ color: '#ccc', mb: 1 }}>K (Neighbors): {kValue}</Typography>
+          <Slider
+            value={kValue}
+            onChange={(_, val) => setKValue(val as number)}
+            min={1}
+            max={15}
+            step={2}
+            marks={[
+              { value: 1, label: '1' },
+              { value: 5, label: '5' },
+              { value: 9, label: '9' },
+              { value: 15, label: '15' },
+            ]}
+            sx={{ 
+              color: primaryColor,
+              '& .MuiSlider-markLabel': { color: '#666', fontSize: '0.75rem' }
+            }}
+          />
+          <Typography sx={{ color: '#777', fontSize: '0.75rem', mt: 1 }}>
+            Uses Jaccard distance for text similarity
+          </Typography>
+        </Box>
+      )}
+
+      {/* Naive Bayes Parameters */}
+      {learningModel === 'naive_bayes' && (
+        <Box sx={{ mt: 2 }}>
+          <FormControl fullWidth sx={{ mb: 2 }}>
+            <InputLabel id="ngram-label" sx={{ color: '#999' }}>
+              N-gram
+            </InputLabel>
+            <Select
+              labelId="ngram-label"
+              value={ngram}
+              onChange={(e) => setNgram(e.target.value)}
+              label="N-gram"
+              sx={{
+                color: '#fff',
+                '.MuiOutlinedInput-notchedOutline': { borderColor: '#444' },
+                '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: primaryColor },
+                '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: primaryColor },
+              }}
+            >
+              <MenuItem value="unigram">Unigram (single words)</MenuItem>
+              <MenuItem value="bigram">Bigram (word pairs)</MenuItem>
+              <MenuItem value="trigram">Trigram (word triplets)</MenuItem>
+            </Select>
+          </FormControl>
+          <FormControl fullWidth>
+            <InputLabel id="feature-label" sx={{ color: '#999' }}>
+              Feature Representation
+            </InputLabel>
+            <Select
+              labelId="feature-label"
+              value={featureRep}
+              onChange={(e) => setFeatureRep(e.target.value)}
+              label="Feature Representation"
+              sx={{
+                color: '#fff',
+                '.MuiOutlinedInput-notchedOutline': { borderColor: '#444' },
+                '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: primaryColor },
+                '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: primaryColor },
+              }}
+            >
+              <MenuItem value="count">Count (word frequency)</MenuItem>
+              <MenuItem value="binary">Binary (presence only)</MenuItem>
+            </Select>
+          </FormControl>
+        </Box>
+      )}
+
+      {/* Naive Automatic Info */}
+      {learningModel === 'naive_automatic' && (
+        <Box sx={{ mt: 2, p: 2, backgroundColor: '#1a1a1c', borderRadius: 1 }}>
+          <Typography sx={{ color: '#ccc', fontSize: '0.85rem' }}>
+            Keyword-based classification using positive/negative word lists.
+          </Typography>
+          <Typography sx={{ color: '#777', fontSize: '0.75rem', mt: 1 }}>
+            Labels: 0 (Negative), 2 (Neutral), 4 (Positive)
+          </Typography>
         </Box>
       )}
     </Paper>

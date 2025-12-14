@@ -60,6 +60,7 @@ const ConfigurationReview = () => {
   // Labeling State
   const [labelingMethod, setLabelingMethod] = useState('');
   const [labelingParams, setLabelingParams] = useState<LabelingParams>({
+    clusteringAlgorithm: 'kmeans',
     nClusters: 3,
     linkage: 'average',
     eps: 0.5,
@@ -78,9 +79,11 @@ const ConfigurationReview = () => {
   const [crossValidation, setCrossValidation] = useState(true);
   const [autoTune, setAutoTune] = useState(false);
   const [testSplit, setTestSplit] = useState(20);
-  const [epochs, setEpochs] = useState(100);
-  const [learningRate, setLearningRate] = useState(0.001);
-  const [batchSize, setBatchSize] = useState(32);
+  // KNN parameters
+  const [kValue, setKValue] = useState(5);
+  // Naive Bayes parameters
+  const [ngram, setNgram] = useState('unigram');
+  const [featureRep, setFeatureRep] = useState('count');
 
   // Progress Modal State
   const [progressModalOpen, setProgressModalOpen] = useState(false);
@@ -168,12 +171,12 @@ const ConfigurationReview = () => {
             setAutoTune={setAutoTune}
             testSplit={testSplit}
             setTestSplit={setTestSplit}
-            epochs={epochs}
-            setEpochs={setEpochs}
-            learningRate={learningRate}
-            setLearningRate={setLearningRate}
-            batchSize={batchSize}
-            setBatchSize={setBatchSize}
+            kValue={kValue}
+            setKValue={setKValue}
+            ngram={ngram}
+            setNgram={setNgram}
+            featureRep={featureRep}
+            setFeatureRep={setFeatureRep}
           />
 
           {/* Advanced Settings Accordion */}
@@ -198,11 +201,11 @@ const ConfigurationReview = () => {
           trainingConfig={{
             learningModel,
             testSplit,
-            epochs,
-            learningRate,
-            batchSize,
             crossValidation,
             autoTune,
+            kValue,
+            ngram,
+            featureRep,
           }}
         />
       </Container>

@@ -66,11 +66,13 @@ interface DataReviewProps {
   trainingConfig?: {
     learningModel: string;
     testSplit: number;
-    epochs: number;
-    learningRate: number;
-    batchSize: number;
     crossValidation: boolean;
     autoTune: boolean;
+    // KNN parameters
+    kValue: number;
+    // Naive Bayes parameters
+    ngram: string;
+    featureRep: string;
   };
 }
 
@@ -265,14 +267,27 @@ const DataReview = ({
           use_default_keywords: labelingParams.useDefaultKeywords,
         });
       } else if (labelingMethod === 'clustering') {
+        const algo = (labelingParams.clusteringAlgorithm || 'kmeans') as 'kmeans' | 'hierarchical' | 'agglomerative' | 'dbscan';
+        const hyperparameters: Record<string, any> = {
+          random_state: labelingParams.randomState,
+        };
+        
+        // Add algorithm-specific hyperparameters
+        if (['kmeans', 'hierarchical', 'agglomerative'].includes(algo)) {
+          hyperparameters.n_clusters = labelingParams.nClusters;
+        }
+        if (['hierarchical', 'agglomerative'].includes(algo)) {
+          hyperparameters.linkage = labelingParams.linkage;
+        }
+        if (algo === 'dbscan') {
+          hyperparameters.eps = labelingParams.eps;
+          hyperparameters.min_samples = labelingParams.minSamples;
+        }
+        
         result = await labelClustering(datasetId, {
           session_id: sessionId,
-          algorithm: 'hierarchical', // Default to hierarchical
-          hyperparameters: {
-            n_clusters: labelingParams.nClusters,
-            linkage: labelingParams.linkage,
-            random_state: labelingParams.randomState,
-          },
+          algorithm: algo,
+          hyperparameters,
         });
       } else if (labelingMethod === 'classify') {
         // Future: ML-based classification
@@ -293,6 +308,15 @@ const DataReview = ({
     try {
       const algorithm = trainingConfig.learningModel; // Already matches backend format
       const hyperparameters: Record<string, any> = {};
+
+      // Add algorithm-specific hyperparameters
+      if (algorithm === 'knn') {
+        hyperparameters.k = trainingConfig.kValue || 5;
+      } else if (algorithm === 'naive_bayes') {
+        hyperparameters.ngram = trainingConfig.ngram || 'unigram';
+        hyperparameters.feature_rep = trainingConfig.featureRep || 'count';
+      }
+      // naive_automatic doesn't need hyperparameters
 
       const result = await trainModel({
         dataset_id: datasetId,
