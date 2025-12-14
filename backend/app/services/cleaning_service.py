@@ -487,29 +487,13 @@ def run_cleaning_job(job_id: str, dataset_id: str, session_id: str, options: Cle
         update_job_progress(job_id, 15, "Detecting encoding and parsing CSV")
         
         # Detect encoding gracefully (similar to input_output.py)
-        encoding = "utf-8"  # Default encoding
-        if CHARDET_AVAILABLE:
-            try:
-                # Sample first 50KB for encoding detection (faster than full file)
-                sample_size = min(50000, len(file_bytes))
-                result = chardet.detect(file_bytes[:sample_size])
-                if result and result.get("encoding"):
-                    detected_encoding = result["encoding"]
-                    # Use detected encoding if confidence is reasonable
-                    if result.get("confidence", 0) > 0.7:
-                        encoding = detected_encoding
-            except Exception as e:
-                # If detection fails, fall back to default
-                pass
-                
-        
         # Decode with graceful fallback
         text = None
         encodings_to_try = ["utf-8", "latin-1", "iso-8859-1", "cp1252", "windows-1252"]
         
         for enc in encodings_to_try:
             try:
-                text = file_bytes.decode(enc, errors="replace")
+                text = file_bytes.decode(enc)
                 break
             except (UnicodeDecodeError, LookupError):
                 continue
