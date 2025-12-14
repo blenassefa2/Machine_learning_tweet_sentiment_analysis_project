@@ -59,6 +59,7 @@ const Navbar = () => {
           {!isMobile && (
             <>
               <Button
+              href="https://docs.google.com/document/d/1G411y6kdRIobKgS2Ip7pQ_Y_fAWtbjaLUT_2d_cufWw/edit?usp=sharing"
                 color="inherit"
                 sx={{
                   textTransform: 'none',
