@@ -92,6 +92,29 @@ const FileUpload = () => {
 
   // ---------------- Upload Function ----------------
   const uploadFile = async (file: File) => {
+    // Validate file size (2MB max)
+    const MAX_SIZE = 2 * 1024 * 1024; // 2MB
+    if (file.size > MAX_SIZE) {
+      setUploadStatus('error');
+      setErrorMessage(`File too large. Maximum size is 2MB, got ${(file.size / (1024 * 1024)).toFixed(2)}MB.`);
+      setModalOpen(true);
+      resetFileInput();
+      return;
+    }
+
+    // Validate file type
+    const validExtensions = ['.csv', '.txt'];
+    const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
+    if (!validExtensions.includes(fileExtension)) {
+      setUploadStatus('error');
+      setErrorMessage('Invalid file type. Only CSV and TXT files are supported.');
+      setModalOpen(true);
+      resetFileInput();
+      return;
+    }
+
+
+
     // Reset state for new upload
     setUploadStatus('uploading');
     setUploadProgress(0);
@@ -155,6 +178,12 @@ const FileUpload = () => {
             sx={{ color: "#ccc", mb: 3, textAlign: "center", px: { xs: 2, md: 0 }, animation: `${fadeInUp} 0.8s ease-out 0.2s both` }}
           >
             Drag and drop your CSV or TXT files or click to browse.
+          </Typography>
+          <Typography
+            variant="body2"
+            sx={{ color: "#999", mb: 2, textAlign: "center", px: { xs: 2, md: 0 }, animation: `${fadeInUp} 0.8s ease-out 0.2s both` }}
+          >
+            Requirements: Max 2MB • UTF-8 encoding • CSV or TXT format
           </Typography>
 
           <Paper
@@ -223,7 +252,7 @@ const FileUpload = () => {
           </Paper>
 
           <Typography variant="body2" sx={{ color: "#999", mt: 2, textAlign: "center", px: { xs: 2, md: 0 } }}>
-            Supported formats: CSV, TXT
+            Supported formats: CSV, TXT • Max 2MB • UTF-8 encoding required
           </Typography>
         </Box>
       </Container>

@@ -513,7 +513,7 @@ const DataReview = ({
                     <Tooltip 
                       title={
                         !dataset.cleaned_file 
-                          ? "Dataset must be cleaned before labeling" 
+                          ? "Dataset must be cleaned before labeling. Refresh recent uploads if dataset already cleaned." 
                           : !labelingConfig?.labelingMethod 
                             ? "Select a labeling method first"
                             : ""
@@ -546,7 +546,7 @@ const DataReview = ({
                     <Tooltip 
                       title={
                         !dataset.cleaned_file 
-                          ? "Dataset must be cleaned before training" 
+                          ? "Dataset must be cleaned before training. Refresh recent uploads if dataset already cleaned." 
                           : !trainingConfig?.learningModel 
                             ? "Select a training model first"
                             : ""
