@@ -191,3 +191,62 @@ export const previewDataset = async (
   return res.data.preview as string[][];
 };
 
+// -------------------------------
+// Full Dataset for Manual Labeling
+// Backend: GET /datasets/{dataset_id}/full
+// -------------------------------
+export interface FullDatasetResponse {
+  rows: string[][];
+  total_count: number;
+  text_column_index: number;
+  filename: string;
+}
+
+export const getFullDataset = async (
+  datasetId: string,
+  sessionId: string,
+  useCleaned: boolean = true
+): Promise<FullDatasetResponse> => {
+  const res = await axios.get(`${API_BASE}/${datasetId}/full`, {
+    params: { session_id: sessionId, use_cleaned: useCleaned },
+  });
+  return res.data as FullDatasetResponse;
+};
+
+// -------------------------------
+// Get Labeling Result with Summary
+// Backend: GET /datasets/{dataset_id}/labeling
+// -------------------------------
+export interface LabelingResult {
+  labeling_id: string;
+  dataset_id: string;
+  session_id: string;
+  method: string;
+  summary: {
+    total?: number;
+    labeled?: number;
+    neutral?: number;
+    total_rows?: number;
+    labeled_rows?: number;
+    unlabeled_rows?: number;
+    label_distribution?: {
+      '0'?: number;
+      '2'?: number;
+      '4'?: number;
+    };
+  };
+  labeled_file: string;
+  status: string;
+  created_at: string;
+}
+
+export const getLabelingResult = async (
+  datasetId: string,
+  sessionId: string
+): Promise<LabelingResult> => {
+  const res = await axios.get(`${API_BASE}/${datasetId}/labeling`, {
+    params: { session_id: sessionId },
+  });
+  return res.data as LabelingResult;
+};
+

@@ -469,49 +469,72 @@ const DataReview = ({
                     >
                       Clean
                     </Button>
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      onClick={() => handleLabel(dataset.dataset_id)}
-                      disabled={!labelingConfig?.labelingMethod || !dataset.cleaned_file}
-                      title={!dataset.cleaned_file ? "Dataset must be cleaned before labeling" : ""}
-                      sx={{
-                        borderColor: primaryColor,
-                        color: primaryColor,
-                        textTransform: 'none',
-                        '&:hover': {
-                          borderColor: primaryColorDark,
-                          backgroundColor: 'rgba(100, 108, 255, 0.1)',
-                        },
-                        '&:disabled': {
-                          borderColor: '#444',
-                          color: '#666',
-                        },
-                      }}
+                    <Tooltip 
+                      title={
+                        !dataset.cleaned_file 
+                          ? "Dataset must be cleaned before labeling" 
+                          : !labelingConfig?.labelingMethod 
+                            ? "Select a labeling method first"
+                            : ""
+                      }
                     >
-                      Label
-                    </Button>
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      onClick={() => handleTrain(dataset.dataset_id)}
-                      disabled={!trainingConfig?.learningModel}
-                      sx={{
-                        borderColor: primaryColor,
-                        color: primaryColor,
-                        textTransform: 'none',
-                        '&:hover': {
-                          borderColor: primaryColorDark,
-                          backgroundColor: 'rgba(100, 108, 255, 0.1)',
-                        },
-                        '&:disabled': {
-                          borderColor: '#444',
-                          color: '#666',
-                        },
-                      }}
+                      <span>
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          onClick={() => handleLabel(dataset.dataset_id)}
+                          disabled={!labelingConfig?.labelingMethod || !dataset.cleaned_file}
+                          sx={{
+                            borderColor: primaryColor,
+                            color: primaryColor,
+                            textTransform: 'none',
+                            '&:hover': {
+                              borderColor: primaryColorDark,
+                              backgroundColor: 'rgba(100, 108, 255, 0.1)',
+                            },
+                            '&:disabled': {
+                              borderColor: '#444',
+                              color: '#666',
+                            },
+                          }}
+                        >
+                          Label
+                        </Button>
+                      </span>
+                    </Tooltip>
+                    <Tooltip 
+                      title={
+                        !dataset.cleaned_file 
+                          ? "Dataset must be cleaned before training" 
+                          : !trainingConfig?.learningModel 
+                            ? "Select a training model first"
+                            : ""
+                      }
                     >
-                      Train
-                    </Button>
+                      <span>
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          onClick={() => handleTrain(dataset.dataset_id)}
+                          disabled={!dataset.cleaned_file || !trainingConfig?.learningModel}
+                          sx={{
+                            borderColor: primaryColor,
+                            color: primaryColor,
+                            textTransform: 'none',
+                            '&:hover': {
+                              borderColor: primaryColorDark,
+                              backgroundColor: 'rgba(100, 108, 255, 0.1)',
+                            },
+                            '&:disabled': {
+                              borderColor: '#444',
+                              color: '#666',
+                            },
+                          }}
+                        >
+                          Train
+                        </Button>
+                      </span>
+                    </Tooltip>
                     <Button
                       variant="contained"
                       size="small"

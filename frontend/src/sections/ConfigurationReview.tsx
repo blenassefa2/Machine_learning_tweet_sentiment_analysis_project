@@ -8,7 +8,6 @@ import {
 } from '@mui/material';
 import { keyframes } from '@emotion/react';
 import ProcessConfigurations from '../components/ProcessConfigurations';
-import AdvancedSettings from '../components/AdvancedSettings';
 import DataReview from '../components/DataReview';
 import ProgressModal from '../components/ProgressModal';
 import EvaluationModal from '../components/EvaluationModal';
@@ -82,12 +81,6 @@ const ConfigurationReview = () => {
   const [epochs, setEpochs] = useState(100);
   const [learningRate, setLearningRate] = useState(0.001);
   const [batchSize, setBatchSize] = useState(32);
-
-  // Advanced Settings
-  const [enableAdvanced, setEnableAdvanced] = useState(false);
-  const [randomState, setRandomState] = useState(42);
-  const [earlyStopping, setEarlyStopping] = useState(false);
-  const [patience, setPatience] = useState(10);
 
   // Progress Modal State
   const [progressModalOpen, setProgressModalOpen] = useState(false);

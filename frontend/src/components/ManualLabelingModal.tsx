@@ -7,13 +7,20 @@ import {
   Button,
   Typography,
   Box,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
   CircularProgress,
+  LinearProgress,
+  Chip,
 } from '@mui/material';
-import { labelSingleRow, previewDataset } from '../api/label';
+import { 
+  SentimentVeryDissatisfied, 
+  SentimentNeutral, 
+  SentimentVerySatisfied,
+  NavigateNext,
+  NavigateBefore,
+  Check,
+  Stop
+} from '@mui/icons-material';
+import { labelManual, getFullDataset } from '../api/label';
 import { useSession } from '../context/SessionContext';
 
 interface ManualLabelingModalProps {
@@ -34,77 +41,137 @@ const ManualLabelingModal = ({
   const { sessionId } = useSession();
   const [currentRowIndex, setCurrentRowIndex] = useState<number>(0);
   const [currentLabel, setCurrentLabel] = useState<number>(2); // Default to neutral
-  const [previewData, setPreviewData] = useState<string[][]>([]);
+  const [allRows, setAllRows] = useState<string[][]>([]);
+  const [textColumnIndex, setTextColumnIndex] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(false);
-  const [annotations, setAnnotations] = useState<Array<{ row_index: number; label: number }>>([]);
-  const [isLabeling, setIsLabeling] = useState<boolean>(false);
+  const [annotations, setAnnotations] = useState<Map<number, number>>(new Map()); // row_index -> label
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   const primaryColor = '#646cff';
 
   useEffect(() => {
     if (open && datasetId && sessionId) {
-      loadPreview();
+      loadFullDataset();
       setCurrentRowIndex(0);
-      setAnnotations([]);
+      setAnnotations(new Map());
     }
   }, [open, datasetId, sessionId]);
 
-  const loadPreview = async () => {
+  const loadFullDataset = async () => {
     if (!datasetId || !sessionId) return;
     setLoading(true);
     try {
-      const preview = await previewDataset(datasetId, sessionId, false);
-      setPreviewData(preview || []);
+      const result = await getFullDataset(datasetId, sessionId, true);
+      setAllRows(result.rows || []);
+      setTextColumnIndex(result.text_column_index || 0);
     } catch (err) {
-      console.error('Failed to load preview:', err);
-      setPreviewData([]);
+      console.error('Failed to load dataset:', err);
+      setAllRows([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleNext = async () => {
-    if (!datasetId || !sessionId || currentRowIndex >= previewData.length) return;
+  const handleLabelRow = (label: number) => {
+    const newAnnotations = new Map(annotations);
+    newAnnotations.set(currentRowIndex, label);
+    setAnnotations(newAnnotations);
+    setCurrentLabel(label);
+  };
 
-    setIsLabeling(true);
+  const handleNext = () => {
+    // Save current annotation if not already saved
+    if (!annotations.has(currentRowIndex)) {
+      handleLabelRow(currentLabel);
+    }
+    
+    if (currentRowIndex < allRows.length - 1) {
+      const nextIndex = currentRowIndex + 1;
+      setCurrentRowIndex(nextIndex);
+      // Set the label to existing annotation or default to neutral
+      setCurrentLabel(annotations.get(nextIndex) ?? 2);
+    }
+  };
+
+  const handlePrevious = () => {
+    if (currentRowIndex > 0) {
+      const prevIndex = currentRowIndex - 1;
+      setCurrentRowIndex(prevIndex);
+      setCurrentLabel(annotations.get(prevIndex) ?? 2);
+    }
+  };
+
+  const handleFinish = async () => {
+    if (!datasetId || !sessionId) return;
+    
+    // Make sure current row is annotated
+    if (!annotations.has(currentRowIndex)) {
+      handleLabelRow(currentLabel);
+    }
+    
+    setIsSubmitting(true);
     try {
-      // Label current row
-      const result = await labelSingleRow(datasetId, {
+      // Convert Map to array of annotations
+      const annotationsList = Array.from(annotations.entries()).map(([row_index, label]) => ({
+        row_index,
+        label,
+      }));
+      
+      const result = await labelManual(datasetId, {
         session_id: sessionId,
-        row_index: currentRowIndex,
-        label: currentLabel,
+        annotations: annotationsList,
+        stop_early: false,
       });
-
-      // Add to annotations
-      const newAnnotation = { row_index: currentRowIndex, label: currentLabel };
-      setAnnotations([...annotations, newAnnotation]);
-
-      // Move to next row
-      if (currentRowIndex < previewData.length - 1) {
-        setCurrentRowIndex(currentRowIndex + 1);
-        setCurrentLabel(2); // Reset to neutral
-      } else {
-        // All rows labeled, complete
-        onComplete(result.job_id);
-        onClose();
-      }
+      
+      onComplete(result.job_id);
     } catch (error) {
-      console.error('Error labeling row:', error);
+      console.error('Error submitting labels:', error);
     } finally {
-      setIsLabeling(false);
+      setIsSubmitting(false);
     }
   };
 
-  const handleStopEarly = () => {
-    if (annotations.length > 0) {
-      onStopEarly(annotations);
+  const handleStopEarly = async () => {
+    if (!datasetId || !sessionId) return;
+    
+    // Make sure current row is annotated
+    if (!annotations.has(currentRowIndex)) {
+      handleLabelRow(currentLabel);
     }
-    onClose();
+    
+    const annotationsList = Array.from(annotations.entries()).map(([row_index, label]) => ({
+      row_index,
+      label,
+    }));
+    
+    if (annotationsList.length > 0) {
+      onStopEarly(annotationsList);
+    } else {
+      onClose();
+    }
   };
 
-  const currentRow = previewData[currentRowIndex] || [];
-  const textColumnIndex = currentRow.length > 5 ? 5 : currentRow.length - 1; // Usually column 5 is tweet
+  const currentRow = allRows[currentRowIndex] || [];
   const currentTweet = currentRow[textColumnIndex] || 'No data available';
+  const progress = allRows.length > 0 ? ((currentRowIndex + 1) / allRows.length) * 100 : 0;
+  const labeledCount = annotations.size;
+  
+  // Count labels by type
+  const labelCounts = { positive: 0, neutral: 0, negative: 0 };
+  annotations.forEach((label) => {
+    if (label === 4) labelCounts.positive++;
+    else if (label === 2) labelCounts.neutral++;
+    else if (label === 0) labelCounts.negative++;
+  });
+
+  const getLabelColor = (label: number) => {
+    switch (label) {
+      case 4: return '#4caf50';
+      case 2: return '#ff9800';
+      case 0: return '#f44336';
+      default: return '#666';
+    }
+  };
 
   return (
     <Dialog
@@ -116,77 +183,179 @@ const ManualLabelingModal = ({
         sx: {
           backgroundColor: '#0f0f11',
           border: '1px solid #1a1a1c',
+          minHeight: '500px',
         },
       }}
     >
-      <DialogTitle sx={{ color: '#fff', fontWeight: 600 }}>
-        Manual Labeling - Row {currentRowIndex + 1} of {previewData.length}
+      <DialogTitle sx={{ color: '#fff', fontWeight: 600, pb: 1 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography variant="h6" sx={{ fontWeight: 600 }}>
+            Manual Labeling
+          </Typography>
+          <Chip 
+            label={`${currentRowIndex + 1} / ${allRows.length}`}
+            sx={{ 
+              backgroundColor: primaryColor, 
+              color: '#fff',
+              fontWeight: 600,
+            }} 
+          />
+        </Box>
+        <LinearProgress 
+          variant="determinate" 
+          value={progress} 
+          sx={{ 
+            mt: 2, 
+            height: 6, 
+            borderRadius: 3,
+            backgroundColor: '#1a1a1c',
+            '& .MuiLinearProgress-bar': {
+              backgroundColor: primaryColor,
+              borderRadius: 3,
+            },
+          }} 
+        />
       </DialogTitle>
+      
       <DialogContent>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, py: 2 }}>
           {loading ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 8, gap: 2 }}>
               <CircularProgress sx={{ color: primaryColor }} />
+              <Typography sx={{ color: '#999' }}>Loading dataset...</Typography>
+            </Box>
+          ) : allRows.length === 0 ? (
+            <Box sx={{ textAlign: 'center', py: 8 }}>
+              <Typography sx={{ color: '#999' }}>No data available</Typography>
             </Box>
           ) : (
             <>
+              {/* Tweet Text Display */}
               <Box>
                 <Typography sx={{ color: '#999', mb: 1, fontSize: '0.875rem' }}>
                   Tweet Text:
                 </Typography>
                 <Box
                   sx={{
-                    p: 2,
+                    p: 3,
                     backgroundColor: '#1a1a1c',
-                    borderRadius: 1,
-                    border: '1px solid #2a2a2c',
-                    minHeight: 100,
+                    borderRadius: 2,
+                    border: annotations.has(currentRowIndex) 
+                      ? `2px solid ${getLabelColor(annotations.get(currentRowIndex)!)}` 
+                      : '1px solid #2a2a2c',
+                    minHeight: 120,
+                    maxHeight: 200,
+                    overflow: 'auto',
                   }}
                 >
-                  <Typography sx={{ color: '#fff', wordBreak: 'break-word' }}>
+                  <Typography sx={{ color: '#fff', wordBreak: 'break-word', lineHeight: 1.6 }}>
                     {currentTweet}
                   </Typography>
                 </Box>
               </Box>
 
-              <FormControl fullWidth>
-                <InputLabel id="label-select" sx={{ color: '#999' }}>
-                  Target Label
-                </InputLabel>
-                <Select
-                  labelId="label-select"
-                  value={currentLabel}
-                  onChange={(e) => setCurrentLabel(e.target.value as number)}
-                  label="Target Label"
+              {/* Quick Label Buttons */}
+              <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center' }}>
+                <Button
+                  variant={annotations.get(currentRowIndex) === 0 ? 'contained' : 'outlined'}
+                  onClick={() => handleLabelRow(0)}
+                  startIcon={<SentimentVeryDissatisfied />}
                   sx={{
-                    color: '#fff',
-                    '.MuiOutlinedInput-notchedOutline': { borderColor: '#1a1a1c' },
-                    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: primaryColor },
-                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: primaryColor },
+                    flex: 1,
+                    py: 1.5,
+                    borderColor: '#f44336',
+                    color: annotations.get(currentRowIndex) === 0 ? '#fff' : '#f44336',
+                    backgroundColor: annotations.get(currentRowIndex) === 0 ? '#f44336' : 'transparent',
+                    '&:hover': {
+                      borderColor: '#f44336',
+                      backgroundColor: annotations.get(currentRowIndex) === 0 ? '#d32f2f' : 'rgba(244, 67, 54, 0.1)',
+                    },
                   }}
                 >
-                  <MenuItem value={0}>0 - Negative</MenuItem>
-                  <MenuItem value={2}>2 - Neutral</MenuItem>
-                  <MenuItem value={4}>4 - Positive</MenuItem>
-                </Select>
-              </FormControl>
+                  Negative (0)
+                </Button>
+                <Button
+                  variant={annotations.get(currentRowIndex) === 2 ? 'contained' : 'outlined'}
+                  onClick={() => handleLabelRow(2)}
+                  startIcon={<SentimentNeutral />}
+                  sx={{
+                    flex: 1,
+                    py: 1.5,
+                    borderColor: '#ff9800',
+                    color: annotations.get(currentRowIndex) === 2 ? '#fff' : '#ff9800',
+                    backgroundColor: annotations.get(currentRowIndex) === 2 ? '#ff9800' : 'transparent',
+                    '&:hover': {
+                      borderColor: '#ff9800',
+                      backgroundColor: annotations.get(currentRowIndex) === 2 ? '#f57c00' : 'rgba(255, 152, 0, 0.1)',
+                    },
+                  }}
+                >
+                  Neutral (2)
+                </Button>
+                <Button
+                  variant={annotations.get(currentRowIndex) === 4 ? 'contained' : 'outlined'}
+                  onClick={() => handleLabelRow(4)}
+                  startIcon={<SentimentVerySatisfied />}
+                  sx={{
+                    flex: 1,
+                    py: 1.5,
+                    borderColor: '#4caf50',
+                    color: annotations.get(currentRowIndex) === 4 ? '#fff' : '#4caf50',
+                    backgroundColor: annotations.get(currentRowIndex) === 4 ? '#4caf50' : 'transparent',
+                    '&:hover': {
+                      borderColor: '#4caf50',
+                      backgroundColor: annotations.get(currentRowIndex) === 4 ? '#388e3c' : 'rgba(76, 175, 80, 0.1)',
+                    },
+                  }}
+                >
+                  Positive (4)
+                </Button>
+              </Box>
 
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              {/* Stats Bar */}
+              <Box sx={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center',
+                p: 2,
+                backgroundColor: '#151517',
+                borderRadius: 2,
+              }}>
+                <Box sx={{ display: 'flex', gap: 2 }}>
+                  <Chip 
+                    icon={<SentimentVeryDissatisfied sx={{ color: '#f44336 !important' }} />}
+                    label={labelCounts.negative} 
+                    size="small"
+                    sx={{ backgroundColor: 'rgba(244, 67, 54, 0.2)', color: '#f44336' }}
+                  />
+                  <Chip 
+                    icon={<SentimentNeutral sx={{ color: '#ff9800 !important' }} />}
+                    label={labelCounts.neutral} 
+                    size="small"
+                    sx={{ backgroundColor: 'rgba(255, 152, 0, 0.2)', color: '#ff9800' }}
+                  />
+                  <Chip 
+                    icon={<SentimentVerySatisfied sx={{ color: '#4caf50 !important' }} />}
+                    label={labelCounts.positive} 
+                    size="small"
+                    sx={{ backgroundColor: 'rgba(76, 175, 80, 0.2)', color: '#4caf50' }}
+                  />
+                </Box>
                 <Typography sx={{ color: '#999', fontSize: '0.875rem' }}>
-                  Labeled: {annotations.length} rows
-                </Typography>
-                <Typography sx={{ color: '#999', fontSize: '0.875rem' }}>
-                  Remaining: {previewData.length - currentRowIndex - 1} rows
+                  Labeled: {labeledCount} / {allRows.length}
                 </Typography>
               </Box>
             </>
           )}
         </Box>
       </DialogContent>
-      <DialogActions sx={{ p: 2, gap: 1 }}>
+      
+      <DialogActions sx={{ p: 2, gap: 1, borderTop: '1px solid #1a1a1c' }}>
         <Button
           onClick={handleStopEarly}
           variant="outlined"
+          startIcon={<Stop />}
+          disabled={isSubmitting || loading}
           sx={{
             borderColor: '#666',
             color: '#999',
@@ -196,36 +365,72 @@ const ManualLabelingModal = ({
             },
           }}
         >
-          Stop Here
+          Stop & Save ({labeledCount})
         </Button>
+        
+        <Box sx={{ flex: 1 }} />
+        
         <Button
-          onClick={handleNext}
-          variant="contained"
-          disabled={isLabeling || loading || currentRowIndex >= previewData.length}
+          onClick={handlePrevious}
+          variant="outlined"
+          startIcon={<NavigateBefore />}
+          disabled={currentRowIndex === 0 || isSubmitting || loading}
           sx={{
-            backgroundColor: primaryColor,
-            color: '#fff',
+            borderColor: '#444',
+            color: '#ccc',
             '&:hover': {
-              backgroundColor: '#5058e6',
+              borderColor: '#666',
+              backgroundColor: 'rgba(255, 255, 255, 0.05)',
             },
             '&:disabled': {
-              backgroundColor: '#444',
-              color: '#666',
+              borderColor: '#333',
+              color: '#555',
             },
           }}
         >
-          {isLabeling ? (
-            <CircularProgress size={20} sx={{ color: '#fff' }} />
-          ) : currentRowIndex >= previewData.length - 1 ? (
-            'Finish'
-          ) : (
-            'Next Row'
-          )}
+          Previous
         </Button>
+        
+        {currentRowIndex < allRows.length - 1 ? (
+          <Button
+            onClick={handleNext}
+            variant="contained"
+            endIcon={<NavigateNext />}
+            disabled={isSubmitting || loading}
+            sx={{
+              backgroundColor: primaryColor,
+              color: '#fff',
+              '&:hover': {
+                backgroundColor: '#5058e6',
+              },
+            }}
+          >
+            Next
+          </Button>
+        ) : (
+          <Button
+            onClick={handleFinish}
+            variant="contained"
+            startIcon={isSubmitting ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : <Check />}
+            disabled={isSubmitting || loading || labeledCount === 0}
+            sx={{
+              backgroundColor: '#4caf50',
+              color: '#fff',
+              '&:hover': {
+                backgroundColor: '#388e3c',
+              },
+              '&:disabled': {
+                backgroundColor: '#333',
+                color: '#666',
+              },
+            }}
+          >
+            {isSubmitting ? 'Submitting...' : `Finish (${labeledCount} labeled)`}
+          </Button>
+        )}
       </DialogActions>
     </Dialog>
   );
 };
 
 export default ManualLabelingModal;
-
