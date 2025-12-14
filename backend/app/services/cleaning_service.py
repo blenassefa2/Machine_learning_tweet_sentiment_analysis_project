@@ -498,9 +498,9 @@ def run_cleaning_job(job_id: str, dataset_id: str, session_id: str, options: Cle
                     # Use detected encoding if confidence is reasonable
                     if result.get("confidence", 0) > 0.7:
                         encoding = detected_encoding
-        except Exception as e:
-            # If detection fails, fall back to default
-            print(f"Falling back to default encoding: {e}")
+            except Exception as e:
+                # If detection fails, fall back to default
+                pass
                 
         
         # Decode with graceful fallback
