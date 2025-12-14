@@ -370,20 +370,38 @@ def run_naive_labeling_job(job_id: str, dataset_id: str, session_id: str, keywor
         file_path = ds.get("cleaned_file") or ds["original_file"]
         df = _load_df_from_storage(file_path)
         
-        if use_default and not keyword_map:
-            # Load default keyword files
-            keyword_map = {}
-            for cname in ["positive", "negative", "pos", "neg"]:
+        # Load default keyword files if use_default is True or if no keyword_map was provided
+        if (use_default or not keyword_map):
+            # Load default keyword files from Supabase storage
+            # Expected paths: keyword/positives.txt and keyword/negatives.txt
+            if not keyword_map:
+                keyword_map = {}
+            
+            # Try loading from keyword/positives.txt and keyword/negatives.txt
+            keyword_paths = [
+                ("positive", "keyword/positives.txt"),
+                ("negative", "keyword/negatives.txt"),
+                # Fallback: try alternative paths for backward compatibility
+                ("pos", "keywords/pos.txt"),
+                ("neg", "keywords/neg.txt"),
+                ("positive", "keywords/positive.txt"),
+                ("negative", "keywords/negative.txt"),
+            ]
+            
+            for label_key, storage_path in keyword_paths:
+                if label_key in keyword_map:  # Skip if already loaded
+                    continue
                 try:
-                    kb = supabase.storage.from_(DATA_BUCKET).download(f"keywords/{cname}.txt")
+                    kb = supabase.storage.from_(DATA_BUCKET).download(storage_path)
                     if kb:
-                        words = kb.decode("utf-8").splitlines()
-                        keyword_map[cname] = words
+                        words = [w.strip() for w in kb.decode("utf-8").splitlines() if w.strip()]
+                        if words:  # Only add if we got actual words
+                            keyword_map[label_key] = words
                 except Exception:
                     continue
         
         if not keyword_map:
-            raise RuntimeError("No keywords provided for naive labeling")
+            raise RuntimeError("No keywords provided for naive labeling. Please ensure keyword/positives.txt and keyword/negatives.txt exist in Supabase storage, or provide a keyword_map.")
         
         text_col_idx = _find_text_column_index(df)
         update_job(job_id, 40, "Applying naive labeling")
