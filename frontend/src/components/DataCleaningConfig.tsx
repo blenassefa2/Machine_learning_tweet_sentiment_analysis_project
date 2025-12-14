@@ -59,8 +59,6 @@ export interface ColumnValidationState {
 interface DataCleaningConfigProps {
   cleaningOption: string;
   setCleaningOption: (value: string) => void;
-  missingValueStrategy: string;
-  setMissingValueStrategy: (value: string) => void;
   textCleaning: TextCleaningState;
   setTextCleaning: (value: TextCleaningState) => void;
   columnValidations: ColumnValidationState[];
@@ -72,8 +70,6 @@ interface DataCleaningConfigProps {
 const DataCleaningConfig = ({
   cleaningOption,
   setCleaningOption,
-  missingValueStrategy,
-  setMissingValueStrategy,
   textCleaning,
   setTextCleaning,
   keepColumns,
@@ -89,6 +85,7 @@ const DataCleaningConfig = ({
   const updateTextCleaning = (field: keyof TextCleaningState, value: any) => {
     setTextCleaning({ ...textCleaning, [field]: value });
   };
+
 
   const confirmedColumns = keepColumns 
     ? keepColumns.split(',').filter(c => c.trim() && c.includes(':'))
@@ -163,58 +160,11 @@ const DataCleaningConfig = ({
             label="Remove Duplicates"
             sx={{ color: '#ccc', mb: 1 }}
           />
-          <FormControlLabel
-            value="missing"
-            control={
-              <Radio
-                sx={{
-                  color: primaryColor,
-                  '&.Mui-checked': {
-                    color: primaryColor,
-                  },
-                }}
-              />
-            }
-            label="Handle Missing Values"
-            sx={{ color: '#ccc' }}
-          />
+         
         </RadioGroup>
       </FormControl>
 
-      {/* Missing Value Strategy */}
-      {cleaningOption === 'missing' && (
-        <Box sx={{ mt: 2, mb: 2 }}>
-          <FormControl fullWidth>
-            <InputLabel id="missing-strategy-label" sx={{ color: '#999' }}>
-              Missing Value Strategy
-            </InputLabel>
-            <Select
-              labelId="missing-strategy-label"
-              value={missingValueStrategy}
-              onChange={(e) => setMissingValueStrategy(e.target.value)}
-              label="Missing Value Strategy"
-              sx={{
-                color: '#fff',
-                '.MuiOutlinedInput-notchedOutline': {
-                  borderColor: '#1a1a1c',
-                },
-                '&:hover .MuiOutlinedInput-notchedOutline': {
-                  borderColor: primaryColor,
-                },
-                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                  borderColor: primaryColor,
-                },
-              }}
-            >
-              <MenuItem value="fill_mean">Fill with Mean</MenuItem>
-              <MenuItem value="fill_median">Fill with Median</MenuItem>
-              <MenuItem value="fill_mode">Fill with Mode</MenuItem>
-              <MenuItem value="fill_constant">Fill with Constant</MenuItem>
-              <MenuItem value="drop_rows">Drop Rows</MenuItem>
-            </Select>
-          </FormControl>
-        </Box>
-      )}
+      
 
       {/* Keep Columns */}
       <Box sx={{ mt: 2, mb: 2 }}>
@@ -252,7 +202,7 @@ const DataCleaningConfig = ({
         {/* Input Fields */}
         <Box sx={{ display: 'flex', gap: 1, mb: 1, alignItems: 'center' }}>
           <TextField
-            label="Column Number"
+            label="Column"
             value={currentColNum}
             onChange={(e) => setCurrentColNum(e.target.value)}
             size="small"
@@ -270,7 +220,7 @@ const DataCleaningConfig = ({
           />
           <FormControl size="small" sx={{ flex: 1 }}>
             <InputLabel id="col-name-input" sx={{ color: '#999' }}>
-              Column Name
+              Name
             </InputLabel>
             <Select
               labelId="col-name-input"

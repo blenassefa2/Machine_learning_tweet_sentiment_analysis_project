@@ -184,18 +184,7 @@ const ConfigurationReview = () => {
           />
 
           {/* Advanced Settings Accordion */}
-          <Box sx={{ mt: 4 }}>
-            <AdvancedSettings
-              enableAdvanced={enableAdvanced}
-              setEnableAdvanced={setEnableAdvanced}
-              randomState={randomState}
-              setRandomState={setRandomState}
-              earlyStopping={earlyStopping}
-              setEarlyStopping={setEarlyStopping}
-              patience={patience}
-              setPatience={setPatience}
-            />
-          </Box>
+         
         </Box>
 
         {/* Recent Uploads */}

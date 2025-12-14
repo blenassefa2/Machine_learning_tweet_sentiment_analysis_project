@@ -92,7 +92,6 @@ const TrainingConfig = ({
           <MenuItem value="knn">K-Nearest Neighbors (KNN)</MenuItem>
           <MenuItem value="naive_bayes">Naive Bayes</MenuItem>
           <MenuItem value="naive_automatic">Naive Automatic</MenuItem>
-          <MenuItem value="decision_tree">Decision Tree</MenuItem>
         </Select>
       </FormControl>
       <Box sx={{ mt: 1 }}>

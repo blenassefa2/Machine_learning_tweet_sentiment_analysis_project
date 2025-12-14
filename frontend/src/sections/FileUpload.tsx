@@ -180,12 +180,12 @@ const FileUpload = () => {
             <input 
               type="file" 
               hidden 
-              id="file-upload" 
+              id="file-input" 
               ref={fileInputRef}
               onChange={handleFileSelect} 
               accept=".csv,.txt" 
             />
-            <label htmlFor="file-upload">
+            <label htmlFor="file-input">
               <Button 
                 component="span" 
                 variant="contained" 
@@ -341,7 +341,7 @@ const FileUpload = () => {
                   >
                     Close
                   </Button>
-                  <label htmlFor="file-upload">
+                  <label htmlFor="file-input">
                     <Button
                       component="span"
                       variant="contained"

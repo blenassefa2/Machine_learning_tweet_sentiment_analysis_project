@@ -128,19 +128,7 @@ const LabelingConfig = ({
             label="Auto Clustering"
             sx={{ color: '#ccc', mb: 1 }}
           />
-          <FormControlLabel
-            value="classify"
-            control={
-              <Radio
-                sx={{
-                  color: primaryColor,
-                  '&.Mui-checked': { color: primaryColor },
-                }}
-              />
-            }
-            label="Classify (ML-based)"
-            sx={{ color: '#ccc' }}
-          />
+        
         </RadioGroup>
       </FormControl>
 
@@ -157,17 +145,7 @@ const LabelingConfig = ({
       {/* Naive Labeling Options */}
       {labelingMethod === 'naive' && (
         <Box sx={{ mt: 2 }}>
-          <FormControlLabel
-            control={
-              <Radio
-                checked={labelingParams.useDefaultKeywords}
-                onChange={(e) => setLabelingParams({ ...labelingParams, useDefaultKeywords: e.target.checked })}
-                sx={{ color: primaryColor, '&.Mui-checked': { color: primaryColor } }}
-              />
-            }
-            label="Use Default Keywords"
-            sx={{ color: '#ccc' }}
-          />
+          
           <Typography sx={{ color: '#999', fontSize: '0.75rem', mt: 1, ml: 4 }}>
             Uses keywords from storage: keywords/positive.txt and keywords/negative.txt
           </Typography>
@@ -225,14 +203,6 @@ const LabelingConfig = ({
         </Accordion>
       )}
 
-      {/* Classify Options (for future ML-based classification) */}
-      {labelingMethod === 'classify' && (
-        <Box sx={{ mt: 2, p: 2, backgroundColor: '#1a1a1c', borderRadius: 1 }}>
-          <Typography sx={{ color: '#999', fontSize: '0.875rem' }}>
-            ML-based classification coming soon. This will use trained models to label data.
-          </Typography>
-        </Box>
-      )}
     </Paper>
   );
 };

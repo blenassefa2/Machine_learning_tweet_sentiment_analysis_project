@@ -137,16 +137,16 @@ const DataReview = ({
       }
       
       // Missing value handling
-      if (cleaningConfig.cleaningOption === 'missing' && cleaningConfig.missingValueStrategy) {
+      if (cleaningConfig.cleaningOption === 'missing' ) {
         const strategyMap: Record<string, MissingValueOption['strategy']> = {
           'fill_mean': 'fill_mean',
           'fill_median': 'fill_median',
           'fill_mode': 'fill_mode',
           'fill_constant': 'fill_constant',
-          'drop': 'drop_rows',
+          'drop_rows': 'drop_rows',
         };
         
-        const strategy = strategyMap[cleaningConfig.missingValueStrategy] || 'fill_mean';
+        const strategy = strategyMap['drop_rows'];
         options.missing_value_options = [{
           strategy,
         }];

@@ -53,8 +53,6 @@ const ProcessConfigurations = (props: ProcessConfigurationsProps) => {
       <DataCleaningConfig
         cleaningOption={props.cleaningOption}
         setCleaningOption={props.setCleaningOption}
-        missingValueStrategy={props.missingValueStrategy}
-        setMissingValueStrategy={props.setMissingValueStrategy}
         textCleaning={props.textCleaning}
         setTextCleaning={props.setTextCleaning}
         columnValidations={props.columnValidations}
