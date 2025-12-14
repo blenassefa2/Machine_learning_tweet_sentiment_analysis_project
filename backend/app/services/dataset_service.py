@@ -40,7 +40,7 @@ def upload_dataset(file: UploadFile, session_id: str) -> dict:
     
     if text is None:
         # Last resort: decode with errors='replace' using utf-8
-        text = file_bytes.decode("utf-8", errors="ignore")
+        text = file_bytes.decode("utf-8")
         
     # Upload file
     supabase.storage.from_(DATA_BUCKET).upload(filename, text.encode("utf-8"))
