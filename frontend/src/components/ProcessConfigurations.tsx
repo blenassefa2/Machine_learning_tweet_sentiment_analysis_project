@@ -1,8 +1,9 @@
 import { Box } from '@mui/material';
 import DataCleaningConfig from './DataCleaningConfig';
-import ClassificationConfig from './ClassificationConfig';
+import LabelingConfig from './LabelingConfig';
 import TrainingConfig from './TrainingConfig';
 import type { TextCleaningState, ColumnValidationState } from './DataCleaningConfig';
+import type { LabelingParams } from './LabelingConfig';
 
 interface ProcessConfigurationsProps {
   // Data Cleaning
@@ -17,18 +18,11 @@ interface ProcessConfigurationsProps {
   keepColumns: string;
   setKeepColumns: (value: string) => void;
   
-  // Classification
-  classifier: string;
-  setClassifier: (value: string) => void;
-  classifierParams: {
-    kernel: string;
-    cValue: number;
-    gamma: string;
-    nEstimators: number;
-    maxDepth: number;
-    kNeighbors: number;
-  };
-  setClassifierParams: (params: any) => void;
+  // Labeling
+  labelingMethod: string;
+  setLabelingMethod: (value: string) => void;
+  labelingParams: LabelingParams;
+  setLabelingParams: (params: LabelingParams) => void;
   
   // Training
   learningModel: string;
@@ -68,11 +62,11 @@ const ProcessConfigurations = (props: ProcessConfigurationsProps) => {
         keepColumns={props.keepColumns}
         setKeepColumns={props.setKeepColumns}
       />
-      <ClassificationConfig
-        classifier={props.classifier}
-        setClassifier={props.setClassifier}
-        classifierParams={props.classifierParams}
-        setClassifierParams={props.setClassifierParams}
+      <LabelingConfig
+        labelingMethod={props.labelingMethod}
+        setLabelingMethod={props.setLabelingMethod}
+        labelingParams={props.labelingParams}
+        setLabelingParams={props.setLabelingParams}
       />
       <TrainingConfig
         learningModel={props.learningModel}

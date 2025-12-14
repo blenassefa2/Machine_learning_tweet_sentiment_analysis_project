@@ -20,10 +20,12 @@ import { keyframes } from '@emotion/react';
 import { useSession } from '../context/SessionContext';
 import { listDatasets } from '../api/datasets';
 import { cleanDataset } from '../api/cleaning';
-import { labelNaive } from '../api/classify';
+import { labelNaive, labelClustering, labelManual } from '../api/label';
 import { trainModel } from '../api/training';
+import ManualLabelingModal from './ManualLabelingModal';
 import type { CleaningOptions, MissingValueOption, ColumnValidationOptions } from '../api/cleaning';
 import type { TextCleaningState, ColumnValidationState } from './DataCleaningConfig';
+import type { LabelingParams } from './LabelingConfig';
 
 const fadeInUp = keyframes`
   from {
@@ -45,7 +47,7 @@ interface Dataset {
 }
 
 interface DataReviewProps {
-  onJobStart: (jobId: string, jobType: 'cleaning' | 'classification' | 'training') => void;
+  onJobStart: (jobId: string, jobType: 'cleaning' | 'labeling' | 'training') => void;
   cleaningConfig?: {
     cleaningOption: string;
     missingValueStrategy: string;
@@ -53,9 +55,9 @@ interface DataReviewProps {
     columnValidations?: ColumnValidationState[];
     keepColumns?: string;
   };
-  classificationConfig?: {
-    classifier: string;
-    classifierParams: any;
+  labelingConfig?: {
+    labelingMethod: string;
+    labelingParams: LabelingParams;
   };
   trainingConfig?: {
     learningModel: string;
@@ -71,13 +73,15 @@ interface DataReviewProps {
 const DataReview = ({
   onJobStart,
   cleaningConfig,
-  classificationConfig,
+  labelingConfig,
   trainingConfig,
 }: DataReviewProps) => {
   const { sessionId } = useSession();
   const [datasets, setDatasets] = useState<Dataset[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [manualLabelingOpen, setManualLabelingOpen] = useState(false);
+  const [currentLabelingDatasetId, setCurrentLabelingDatasetId] = useState<string | null>(null);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const primaryColor = '#646cff';
@@ -238,17 +242,43 @@ const DataReview = ({
     }
   };
 
-  const handleClassify = async (datasetId: string) => {
-    if (!classificationConfig || !sessionId) return;
+  const handleLabel = async (datasetId: string) => {
+    if (!labelingConfig || !sessionId) return;
 
     try {
-      const result = await labelNaive(datasetId, {
-        session_id: sessionId,
-        use_default_keywords: true,
-      });
-      onJobStart(result.job_id, 'classification');
+      const { labelingMethod, labelingParams } = labelingConfig;
+      let result;
+
+      if (labelingMethod === 'manual') {
+        // Open manual labeling modal
+        setCurrentLabelingDatasetId(datasetId);
+        setManualLabelingOpen(true);
+        return; // Don't start job yet, modal will handle it
+      } else if (labelingMethod === 'naive') {
+        result = await labelNaive(datasetId, {
+          session_id: sessionId,
+          use_default_keywords: labelingParams.useDefaultKeywords,
+        });
+      } else if (labelingMethod === 'clustering') {
+        result = await labelClustering(datasetId, {
+          session_id: sessionId,
+          algorithm: 'hierarchical', // Default to hierarchical
+          hyperparameters: {
+            n_clusters: labelingParams.nClusters,
+            linkage: labelingParams.linkage,
+            random_state: labelingParams.randomState,
+          },
+        });
+      } else if (labelingMethod === 'classify') {
+        // Future: ML-based classification
+        throw new Error('Classify method not yet implemented');
+      } else {
+        throw new Error('Unknown labeling method');
+      }
+
+      onJobStart(result.job_id, 'labeling');
     } catch (error) {
-      console.error('Error starting classification job:', error);
+      console.error('Error starting labeling job:', error);
     }
   };
 
@@ -264,24 +294,10 @@ const DataReview = ({
         'knn': 'knn',
       };
 
-      const algorithm = classificationConfig?.classifier
-        ? algorithmMap[classificationConfig.classifier] || classificationConfig.classifier
-        : 'naive_bayes';
-
+      // For training, we still need classifier info from labeling config if available
+      // This is a temporary bridge - in the future training will use labeled datasets
+      const algorithm = 'naive_bayes'; // Default algorithm
       const hyperparameters: Record<string, any> = {};
-      
-      if (classificationConfig?.classifierParams) {
-        const params = classificationConfig.classifierParams;
-        if (classificationConfig.classifier === 'svm') {
-          hyperparameters.kernel = params.kernel;
-          hyperparameters.C = params.cValue;
-        } else if (classificationConfig.classifier === 'random-forest') {
-          hyperparameters.n_estimators = params.nEstimators;
-          hyperparameters.max_depth = params.maxDepth;
-        } else if (classificationConfig.classifier === 'knn') {
-          hyperparameters.n_neighbors = params.kNeighbors;
-        }
-      }
 
       const result = await trainModel({
         dataset_id: datasetId,
@@ -297,11 +313,11 @@ const DataReview = ({
   };
 
   const handleProcess = async (datasetId: string) => {
-    // Process = Clean -> Classify -> Train in sequence
+    // Process = Clean -> Label -> Train in sequence
     try {
       await handleClean(datasetId);
       // Note: In a real implementation, you'd wait for cleaning to complete
-      // before starting classification, and so on. This is a simplified version.
+      // before starting labeling, and so on. This is a simplified version.
     } catch (error) {
       console.error('Error processing dataset:', error);
     }
@@ -455,8 +471,8 @@ const DataReview = ({
                     <Button
                       variant="outlined"
                       size="small"
-                      onClick={() => handleClassify(dataset.dataset_id)}
-                      disabled={!classificationConfig?.classifier}
+                      onClick={() => handleLabel(dataset.dataset_id)}
+                      disabled={!labelingConfig?.labelingMethod}
                       sx={{
                         borderColor: primaryColor,
                         color: primaryColor,
@@ -471,7 +487,7 @@ const DataReview = ({
                         },
                       }}
                     >
-                      Classify
+                      Label
                     </Button>
                     <Button
                       variant="outlined"
@@ -498,7 +514,7 @@ const DataReview = ({
                       variant="contained"
                       size="small"
                       onClick={() => handleProcess(dataset.dataset_id)}
-                      disabled={!cleaningConfig?.cleaningOption || !classificationConfig?.classifier || !trainingConfig?.learningModel}
+                      disabled={!cleaningConfig?.cleaningOption || !labelingConfig?.labelingMethod || !trainingConfig?.learningModel}
                       sx={{
                         backgroundColor: primaryColor,
                         color: '#fff',
@@ -524,6 +540,37 @@ const DataReview = ({
           </List>
         )}
       </Paper>
+
+      {/* Manual Labeling Modal */}
+      <ManualLabelingModal
+        open={manualLabelingOpen}
+        datasetId={currentLabelingDatasetId}
+        onClose={() => {
+          setManualLabelingOpen(false);
+          setCurrentLabelingDatasetId(null);
+        }}
+        onComplete={async (jobId: string) => {
+          onJobStart(jobId, 'labeling');
+          setManualLabelingOpen(false);
+          setCurrentLabelingDatasetId(null);
+        }}
+        onStopEarly={async (annotations) => {
+          if (currentLabelingDatasetId && sessionId) {
+            try {
+              const result = await labelManual(currentLabelingDatasetId, {
+                session_id: sessionId,
+                annotations,
+                stop_early: true,
+              });
+              onJobStart(result.job_id, 'labeling');
+            } catch (error) {
+              console.error('Error starting manual labeling job:', error);
+            }
+          }
+          setManualLabelingOpen(false);
+          setCurrentLabelingDatasetId(null);
+        }}
+      />
     </Box>
   );
 };

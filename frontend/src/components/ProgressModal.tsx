@@ -18,7 +18,7 @@ import {
 } from '@mui/material';
 import { CheckCircle, Error as ErrorIcon } from '@mui/icons-material';
 import { getCleaningJob } from '../api/cleaning';
-import { getClassifyJob } from '../api/classify';
+import { getLabelJob } from '../api/label';
 import { getTrainingJob } from '../api/training';
 import { previewDataset } from '../api/datasets';
 import { useSession } from '../context/SessionContext';
@@ -26,7 +26,7 @@ import { useSession } from '../context/SessionContext';
 interface ProgressModalProps {
   open: boolean;
   jobId: string | null;
-  jobType: 'cleaning' | 'classification' | 'training' | null;
+  jobType: 'cleaning' | 'labeling' | 'training' | null;
   onClose: () => void;
   onComplete?: () => void;
 }
@@ -58,8 +58,8 @@ const ProgressModal = ({ open, jobId, jobType, onClose, onComplete }: ProgressMo
         let response;
         if (jobType === 'cleaning') {
           response = await getCleaningJob(jobId);
-        } else if (jobType === 'classification') {
-          response = await getClassifyJob(jobId);
+        } else if (jobType === 'labeling') {
+          response = await getLabelJob(jobId);
         } else if (jobType === 'training') {
           response = await getTrainingJob(jobId);
         } else {
@@ -68,8 +68,8 @@ const ProgressModal = ({ open, jobId, jobType, onClose, onComplete }: ProgressMo
 
         setStatus(response.status);
         
-        // Store dataset_id for cleaning jobs
-        if (jobType === 'cleaning' && (response as any).dataset_id) {
+        // Store dataset_id for cleaning and labeling jobs
+        if ((jobType === 'cleaning' || jobType === 'labeling') && (response as any).dataset_id) {
           setDatasetId((response as any).dataset_id);
         }
         
@@ -94,10 +94,14 @@ const ProgressModal = ({ open, jobId, jobType, onClose, onComplete }: ProgressMo
           if (interval) clearInterval(interval);
           setProgress(100);
           
-          // Load preview for cleaning jobs (use dataset_id from response if available)
+          // Load preview for cleaning and labeling jobs (use dataset_id from response if available)
           const currentDatasetId = (response as any).dataset_id || datasetId;
-          if (jobType === 'cleaning' && currentDatasetId && sessionId && previewData.length === 0) {
-            loadCleanedPreview(currentDatasetId, sessionId);
+          if ((jobType === 'cleaning' || jobType === 'labeling') && currentDatasetId && sessionId && previewData.length === 0) {
+            if (jobType === 'cleaning') {
+              loadCleanedPreview(currentDatasetId, sessionId);
+            } else if (jobType === 'labeling') {
+              loadLabeledPreview(currentDatasetId, sessionId);
+            }
           }
           
           if (onComplete) onComplete();
@@ -125,6 +129,21 @@ const ProgressModal = ({ open, jobId, jobType, onClose, onComplete }: ProgressMo
     setLoadingPreview(true);
     try {
       const preview = await previewDataset(datasetId, sessionId, true);
+      setPreviewData(preview || []);
+    } catch (err: any) {
+      console.error('Failed to load preview:', err);
+      setPreviewData([['Unable to load preview']]);
+    } finally {
+      setLoadingPreview(false);
+    }
+  };
+
+  const loadLabeledPreview = async (datasetId: string, sessionId: string) => {
+    setLoadingPreview(true);
+    try {
+      // For labeled datasets, show the original/cleaned version (not the labeled file itself)
+      // The labeled file has labels added, but we want to show the data that was labeled
+      const preview = await previewDataset(datasetId, sessionId, false);
       setPreviewData(preview || []);
     } catch (err: any) {
       console.error('Failed to load preview:', err);
@@ -166,7 +185,7 @@ const ProgressModal = ({ open, jobId, jobType, onClose, onComplete }: ProgressMo
     >
       <DialogTitle sx={{ color: '#fff', fontWeight: 600 }}>
         {jobType === 'cleaning' && 'Data Cleaning'}
-        {jobType === 'classification' && 'Classification'}
+        {jobType === 'labeling' && 'Labeling'}
         {jobType === 'training' && 'Model Training'}
       </DialogTitle>
       <DialogContent>
@@ -208,10 +227,12 @@ const ProgressModal = ({ open, jobId, jobType, onClose, onComplete }: ProgressMo
                   {message}
                 </Typography>
               )}
-              {jobType === 'cleaning' && (
+              {(jobType === 'cleaning' || jobType === 'labeling') && (
                 <Box sx={{ width: '100%', mt: 2 }}>
                   <Typography sx={{ color: '#fff', mb: 1, fontSize: '0.875rem', fontWeight: 500 }}>
-                    Preview of Cleaned Data (Top 5 rows):
+                    {jobType === 'cleaning' 
+                      ? 'Preview of Cleaned Data (Top 5 rows):'
+                      : 'Preview of Labeled Dataset (Top 5 rows):'}
                   </Typography>
                   {loadingPreview ? (
                     <CircularProgress size={24} sx={{ color: primaryColor }} />

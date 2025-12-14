@@ -12,6 +12,7 @@ import AdvancedSettings from '../components/AdvancedSettings';
 import DataReview from '../components/DataReview';
 import ProgressModal from '../components/ProgressModal';
 import type { TextCleaningState, ColumnValidationState } from '../components/DataCleaningConfig';
+import type { LabelingParams } from '../components/LabelingConfig';
 
 const fadeInUp = keyframes`
   from {
@@ -55,12 +56,17 @@ const ConfigurationReview = () => {
   });
   const [columnValidations, setColumnValidations] = useState<ColumnValidationState[]>([]);
 
-  // Classification State
-  const [classifier, setClassifier] = useState('');
-  const [classifierParams, setClassifierParams] = useState({
+  // Labeling State
+  const [labelingMethod, setLabelingMethod] = useState('');
+  const [labelingParams, setLabelingParams] = useState<LabelingParams>({
+    nClusters: 3,
+    linkage: 'average',
+    eps: 0.5,
+    minSamples: 5,
+    randomState: 42,
+    useDefaultKeywords: false,
     kernel: 'rbf',
     cValue: 1.0,
-    gamma: 'scale',
     nEstimators: 100,
     maxDepth: 10,
     kNeighbors: 5,
@@ -84,9 +90,9 @@ const ConfigurationReview = () => {
   // Progress Modal State
   const [progressModalOpen, setProgressModalOpen] = useState(false);
   const [currentJobId, setCurrentJobId] = useState<string | null>(null);
-  const [currentJobType, setCurrentJobType] = useState<'cleaning' | 'classification' | 'training' | null>(null);
+  const [currentJobType, setCurrentJobType] = useState<'cleaning' | 'labeling' | 'training' | null>(null);
 
-  const handleJobStart = (jobId: string, jobType: 'cleaning' | 'classification' | 'training') => {
+  const handleJobStart = (jobId: string, jobType: 'cleaning' | 'labeling' | 'training') => {
     setCurrentJobId(jobId);
     setCurrentJobType(jobType);
     setProgressModalOpen(true);
@@ -141,10 +147,10 @@ const ConfigurationReview = () => {
             setColumnValidations={setColumnValidations}
             keepColumns={keepColumns}
             setKeepColumns={setKeepColumns}
-            classifier={classifier}
-            setClassifier={setClassifier}
-            classifierParams={classifierParams}
-            setClassifierParams={setClassifierParams}
+            labelingMethod={labelingMethod}
+            setLabelingMethod={setLabelingMethod}
+            labelingParams={labelingParams}
+            setLabelingParams={setLabelingParams}
             learningModel={learningModel}
             setLearningModel={setLearningModel}
             crossValidation={crossValidation}
@@ -186,9 +192,9 @@ const ConfigurationReview = () => {
             columnValidations,
             keepColumns,
           }}
-          classificationConfig={{
-            classifier,
-            classifierParams,
+          labelingConfig={{
+            labelingMethod,
+            labelingParams,
           }}
           trainingConfig={{
             learningModel,
