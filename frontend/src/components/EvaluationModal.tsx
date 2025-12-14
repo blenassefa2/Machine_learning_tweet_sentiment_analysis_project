@@ -262,7 +262,7 @@ const EvaluationModal = ({ open, evaluation, onClose }: EvaluationModalProps) =>
         <Box sx={{ py: 2 }}>
           {/* Metric Cards */}
           <Grid container spacing={2} sx={{ mb: 4 }}>
-            <Grid item xs={6} sm={3}>
+            <Grid size={{ xs: 6, sm: 3 }}>
               <MetricCard
                 icon={<Speed />}
                 title="Accuracy"
@@ -270,7 +270,7 @@ const EvaluationModal = ({ open, evaluation, onClose }: EvaluationModalProps) =>
                 color="#4caf50"
               />
             </Grid>
-            <Grid item xs={6} sm={3}>
+            <Grid size={{ xs: 6, sm: 3 }}>
               <MetricCard
                 icon={<TrackChanges />}
                 title="Precision"
@@ -278,7 +278,7 @@ const EvaluationModal = ({ open, evaluation, onClose }: EvaluationModalProps) =>
                 color="#2196f3"
               />
             </Grid>
-            <Grid item xs={6} sm={3}>
+            <Grid size={{ xs: 6, sm: 3 }}>
               <MetricCard
                 icon={<TrackChanges />}
                 title="Recall"
@@ -286,7 +286,7 @@ const EvaluationModal = ({ open, evaluation, onClose }: EvaluationModalProps) =>
                 color="#ff9800"
               />
             </Grid>
-            <Grid item xs={6} sm={3}>
+            <Grid size={{ xs: 6, sm: 3 }}>
               <MetricCard
                 icon={<Assessment />}
                 title="F1 Score"
