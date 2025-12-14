@@ -109,7 +109,7 @@ def extract_text_and_target(df: pd.DataFrame):
         raise RuntimeError("No text column found.")
 
     if "target" not in df.columns:
-        raise RuntimeError("Dataset has no target column — cannot train.")
+        raise RuntimeError("Dataset file needs a target column to use for training. Please label the dataset first or ensure the file has a target column.")
 
     return df[text_col].astype(str), df["target"]
 
@@ -237,9 +237,56 @@ def run_training_job(job_id: str, model_id: str, dataset_id: str, session_id: st
             raise RuntimeError("Dataset not found.")
         ds = ds[0]
 
+        # Determine which file to use: labeled_file > cleaned_file (if has target) > original_file
+        file_to_use = None
+        file_source = None
+        
+        if ds.get("labeled_file"):
+            file_to_use = ds["labeled_file"]
+            file_source = "labeled"
+        elif ds.get("cleaned_file"):
+            # Check if cleaned file has target column
+            try:
+                test_df = load_csv_from_storage(ds["cleaned_file"])
+                # Check if it has target column (either as column name or column 0)
+                if "target" in test_df.columns or (len(test_df.columns) > 0 and test_df.iloc[:, 0].dtype in [int, float]):
+                    file_to_use = ds["cleaned_file"]
+                    file_source = "cleaned"
+            except Exception:
+                pass
+        
+        if not file_to_use:
+            file_to_use = ds.get("original_file")
+            file_source = "original"
+        
+        if not file_to_use:
+            raise RuntimeError("No dataset file available for training.")
+        
         # Load CSV
-        df = load_csv_from_storage(ds["original_file"])
-        X_text, y = extract_text_and_target(df)
+        df = load_csv_from_storage(file_to_use)
+        
+        # Handle labeled files (no headers, target in column 0)
+        if file_source == "labeled":
+            # Labeled files have no headers, target is in column 0
+            # Find text column (usually last column or column with most text)
+            text_col_idx = len(df.columns) - 1
+            for idx in range(len(df.columns)):
+                if idx == 0:  # Skip target column
+                    continue
+                col = df.iloc[:, idx]
+                try:
+                    avg_len = col.astype(str).str.len().mean()
+                    if not pd.isna(avg_len) and avg_len > 10:
+                        text_col_idx = idx
+                        break
+                except Exception:
+                    continue
+            
+            X_text = df.iloc[:, text_col_idx].astype(str)
+            y = df.iloc[:, 0].astype(int)  # Target is in column 0
+        else:
+            # For cleaned/original files, use standard extraction
+            X_text, y = extract_text_and_target(df)
 
         # Split
         update_job(job_id, 30, "Splitting dataset")

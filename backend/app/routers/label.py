@@ -43,6 +43,11 @@ def label_dataset(
     if not res.data:
         raise HTTPException(status_code=404, detail="Dataset not found")
     
+    # Check if dataset has a cleaned file
+    ds = res.data[0]
+    if not ds.get("cleaned_file"):
+        raise HTTPException(status_code=400, detail="Dataset must have a cleaned file before labeling. Please clean the dataset first.")
+    
     job_id = create_label_job(dataset_id, session_id, method)
     
     if method == "manual":
@@ -96,6 +101,11 @@ def label_manual(dataset_id: str, req: ManualLabelRequest, background_tasks: Bac
     res = supabase.table("datasets").select("*").eq("dataset_id", dataset_id).eq("session_id", req.session_id).execute()
     if not res.data:
         raise HTTPException(status_code=404, detail="Dataset not found")
+    
+    # Check if dataset has a cleaned file
+    ds = res.data[0]
+    if not ds.get("cleaned_file"):
+        raise HTTPException(status_code=400, detail="Dataset must have a cleaned file before labeling. Please clean the dataset first.")
 
     job_id = create_label_job(dataset_id, req.session_id, "manual")
     background_tasks.add_task(
@@ -111,6 +121,15 @@ def label_manual(dataset_id: str, req: ManualLabelRequest, background_tasks: Bac
 @router.post("/{dataset_id}/label/manual/row")
 def label_single_row(dataset_id: str, req: SingleLabelRequest, background_tasks: BackgroundTasks):
     """Label a single row (for modal UI)."""
+    res = supabase.table("datasets").select("*").eq("dataset_id", dataset_id).eq("session_id", req.session_id).execute()
+    if not res.data:
+        raise HTTPException(status_code=404, detail="Dataset not found")
+    
+    # Check if dataset has a cleaned file
+    ds = res.data[0]
+    if not ds.get("cleaned_file"):
+        raise HTTPException(status_code=400, detail="Dataset must have a cleaned file before labeling. Please clean the dataset first.")
+    
     job_id = create_label_job(dataset_id, req.session_id, "manual_single")
     background_tasks.add_task(
         run_manual_labeling_job, 
@@ -128,6 +147,11 @@ def label_naive(dataset_id: str, req: NaiveLabelRequest, background_tasks: Backg
     res = supabase.table("datasets").select("*").eq("dataset_id", dataset_id).eq("session_id", req.session_id).execute()
     if not res.data:
         raise HTTPException(status_code=404, detail="Dataset not found")
+    
+    # Check if dataset has a cleaned file
+    ds = res.data[0]
+    if not ds.get("cleaned_file"):
+        raise HTTPException(status_code=400, detail="Dataset must have a cleaned file before labeling. Please clean the dataset first.")
 
     job_id = create_label_job(dataset_id, req.session_id, "naive")
     background_tasks.add_task(
@@ -146,6 +170,11 @@ def label_clustering(dataset_id: str, req: ClusteringLabelRequest, background_ta
     res = supabase.table("datasets").select("*").eq("dataset_id", dataset_id).eq("session_id", req.session_id).execute()
     if not res.data:
         raise HTTPException(status_code=404, detail="Dataset not found")
+    
+    # Check if dataset has a cleaned file
+    ds = res.data[0]
+    if not ds.get("cleaned_file"):
+        raise HTTPException(status_code=400, detail="Dataset must have a cleaned file before labeling. Please clean the dataset first.")
 
     job_id = create_label_job(dataset_id, req.session_id, req.algorithm)
     background_tasks.add_task(
